@@ -160,7 +160,7 @@ class IPCameraCapture(VideoCaptureBase):
 if __name__ == "__main__":
     # Example usage
     camera = IPCameraCapture(source="rtsp://192.168.1.153:554/h264Preview_01_sub",
-                                 username="admin", password="m0nkey")
+                                 username="admin", password="password")
     
     if camera.connect():
         camera.start()

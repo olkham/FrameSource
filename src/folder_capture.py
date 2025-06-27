@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import time
-from typing import Optional, Tuple, Any, List
+from typing import Optional, Tuple, List
 from video_capture_base import VideoCaptureBase
 import logging
 
@@ -129,7 +129,6 @@ class FolderCapture(VideoCaptureBase):
             else:
                 return False, None
         img_path = self.image_files[self.index]
-        print(f"Reading image: {img_path}")
         img = cv2.imread(img_path)
         if img is None:
             logger.warning(f"Failed to read image: {img_path}")
