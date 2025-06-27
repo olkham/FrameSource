@@ -232,7 +232,7 @@ if __name__ == "__main__":
     # test_camera('webcam', source=0)  # Change to 'ximea', 'ipcam', 'video_file', etc. as needed
     # test_camera('video_file', source="C:/Users/optane/Desktop/random_concat_20250604_112614.mp4", loop=True)  # Example for video file capture
     # test_camera('ximea')  # Change to 'ximea', 'ipcam', 'video_file', etc. as needed
-    # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="m0nkey")  # Example for IP camera capture
+    # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="password")  # Example for IP camera capture
     # test_camera('folder', source="C:/Users/optane/Desktop/bird-calls-dataset/images/default", sort_by='date', fps=30, real_time=True, loop=True)
 
     cameras = [
