@@ -25,17 +25,8 @@ def test_camera(name, **kwargs):
         else:
             min_gain, max_gain = None, None
 
-        camera.set_exposure(10000)
-        camera.set_gain(0)
-
         # Lock exposure time but allow gain to vary for auto exposure
         try:
-            # Disable full auto exposure/gain first
-            # camera.enable_auto_exposure(True)
-            
-            # Set a fixed exposure time (10ms = 10000 microseconds)
-            camera.set_exposure(10000)
-            
             # Enable auto gain only while keeping exposure fixed
             camera.enable_auto_exposure(True)  # Enable auto exposure/gain
             
@@ -109,15 +100,26 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
     
 
     capture_instances = []
-    for cam_cfg in cameras:
+    grid_cols = 3
+    grid_rows = 2
+    win_w, win_h = 640, 480
+    for idx, cam_cfg in enumerate(cameras):
         name = cam_cfg.pop('capture_type', None)
         if not name:
             print(f"Camera config missing 'capture_type': {cam_cfg}")
             continue
         cv2.namedWindow(f"{name}", cv2.WINDOW_NORMAL)
+        # Set window size and position for grid
+        cv2.resizeWindow(f"{name}", win_w, win_h)
+        col = idx % grid_cols
+        row = idx // grid_cols
+        x = col * win_w
+        y = row * win_h
+        cv2.moveWindow(f"{name}", x, y+(25* row))  # Add some vertical spacing
         print(f"Testing {name} Capture:")
         camera = FrameSourceFactory.create(name, **cam_cfg)
         if camera.connect():
+            camera.enable_auto_exposure(True)  # Enable auto exposure by default
             if threaded:
                 camera.start()  # Always use threaded capture for this test
             capture_instances.append((name, camera))
@@ -157,7 +159,7 @@ if __name__ == "__main__":
         {'capture_type': 'basler', 'threaded': True},
         {'capture_type': 'ximea', 'threaded': True},
         {'capture_type': 'webcam', 'threaded': True},
-        {'capture_type': 'ipcam', 'source': "rtsp://192.168.1.153:554/h264Preview_01_sub", 'username': "admin", 'password': "password", 'threaded': True},
+        {'capture_type': 'ipcam', 'source': "rtsp://192.168.1.153:554/h264Preview_01_sub", 'username': "admin", 'password': "m0nkey", 'threaded': True},
         {'capture_type': 'video_file', 'source': "C:/Users/optane/Desktop/random_concat_20250604_112614.mp4", 'loop': True, 'threaded': True},
         {'capture_type': 'folder', 'source': "C:/Users/optane/Desktop/bird-calls-dataset/images/default", 'sort_by': 'date', 'fps': 30, 'real_time': True, 'loop': True, 'threaded': False}
     ]
