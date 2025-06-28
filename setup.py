@@ -5,8 +5,8 @@ setup(
     version="0.1.0",
     description="A flexible, extensible Python framework for acquiring frames from cameras, video files, and image folders.",
     author="Your Name",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    packages=find_packages(where="frame_source"),
+    package_dir={"": "frame_source"},
     install_requires=[
         "opencv-python",
         "numpy"

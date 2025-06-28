@@ -2,6 +2,7 @@ from frame_source import FrameSourceFactory
 import cv2
 from typing import Any, List
 
+
 def test_camera(name, **kwargs):
     # Example 1: Webcam capture
     cv2.namedWindow("camera", cv2.WINDOW_NORMAL)
