@@ -34,12 +34,10 @@ class VideoCaptureFactory:
     """Factory class for creating video capture instances."""
 
     _capture_types = {
+        'folder': FolderCapture,
+        'video_file': VideoFileCapture,
         'webcam': WebcamCapture,
         'ipcam': IPCameraCapture,
-        'ximea': XimeaCapture,
-        'video_file': VideoFileCapture,
-        'basler': BaslerCapture,
-        'folder': FolderCapture
     }
     
     @classmethod
@@ -190,6 +188,9 @@ def test_camera(name, **kwargs):
 def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
     """Test connecting to multiple different cameras types and viewing them live concurrently."""
     
+    VideoCaptureFactory.register_capture_type('basler', BaslerCapture)
+    VideoCaptureFactory.register_capture_type('ximea', XimeaCapture)
+
     capture_instances = []
     for cam_cfg in cameras:
         name = cam_cfg.pop('capture_type', None)
@@ -234,6 +235,8 @@ if __name__ == "__main__":
     # test_camera('ximea')  # Change to 'ximea', 'ipcam', 'video_file', etc. as needed
     # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="password")  # Example for IP camera capture
     # test_camera('folder', source="C:/Users/optane/Desktop/bird-calls-dataset/images/default", sort_by='date', fps=30, real_time=True, loop=True)
+
+
 
     cameras = [
         {'capture_type': 'basler', 'threaded': True},
