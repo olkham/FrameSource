@@ -2,17 +2,18 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import cv2
 import logging
-from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class IPCameraCapture(VideoCaptureBase):
+class VideoFileCapture(VideoCaptureBase):
     def start(self):
         """
-        Start background thread to continuously capture frames from IP camera.
+        Start background thread to continuously capture frames from video file.
         """
         import threading
         import time
@@ -52,62 +53,74 @@ class IPCameraCapture(VideoCaptureBase):
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
-        Directly read a frame from the IP camera (bypassing background thread logic).
+        Directly read a frame from the video file (bypassing background thread logic).
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
         if not self.is_connected or self.cap is None:
             return False, None
+        # Add delay for real-time playback simulation
+        if self.real_time:
+            video_fps = self.cap.get(cv2.CAP_PROP_FPS)
+            if video_fps > 0:
+                frame_duration = 1.0 / video_fps
+                current_time = time.time()
+                elapsed = current_time - self.time_of_last_frame
+                if elapsed < frame_duration:
+                    time.sleep(frame_duration - elapsed)
+                self.time_of_last_frame = time.time()
         ret, frame = self.cap.read()
+        # If we've reached the end of the video and looping is enabled
+        if not ret and self.loop:
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = self.cap.read()
+            if self.real_time:
+                self.time_of_last_frame = time.time()
         return ret, frame if ret else None
 
-    """IP Camera capture using OpenCV with RTSP/HTTP streams."""
+    """Video file capture using OpenCV."""
     
-    def __init__(self, source: str, username: str = None, password: str = None, **kwargs):
+    def __init__(self, source: str, **kwargs):
         super().__init__(source, **kwargs)
-        self.username = username
-        self.password = password
         self.cap = None
-        self.stream_url = self._build_stream_url()
+        self.loop = kwargs.get('loop', False)
+        self.real_time = kwargs.get('real_time', True)
+        self.time_of_last_frame = 0.0
         
-    def _build_stream_url(self) -> str:
-        """Build stream URL with authentication if provided."""
-        if self.username and self.password:
-            # Insert credentials into URL
-            if "://" in self.source:
-                protocol, rest = self.source.split("://", 1)
-                return f"{protocol}://{self.username}:{self.password}@{rest}"
-        return self.source
-    
     def connect(self) -> bool:
-        """Connect to IP camera."""
+        """Connect to video file."""
         try:
-            self.cap = cv2.VideoCapture(self.stream_url)
+            self.cap = cv2.VideoCapture(self.source)
             if not self.cap.isOpened():
-                logger.error(f"Failed to open IP camera stream: {self.stream_url}")
+                logger.error(f"Failed to open video file {self.source}")
                 return False
             
-            # Set buffer size to reduce latency
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            
+            # Set additional parameters if provided
+            if 'width' in self.config:
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config['width'])
+            if 'height' in self.config:
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config['height'])
+            if 'fps' in self.config:
+                self.cap.set(cv2.CAP_PROP_FPS, self.config['fps'])
+                
             self.is_connected = True
-            logger.info(f"Connected to IP camera: {self.source}")
+            logger.info(f"Connected to video file {self.source}")
             return True
         except Exception as e:
-            logger.error(f"Error connecting to IP camera: {e}")
+            logger.error(f"Error connecting to video file: {e}")
             return False
     
     def disconnect(self) -> bool:
-        """Disconnect from IP camera."""
+        """Disconnect from video file."""
         try:
             if self.cap is not None:
                 self.cap.release()
                 self.cap = None
             self.is_connected = False
-            logger.info("Disconnected from IP camera")
+            logger.info("Disconnected from video file")
             return True
         except Exception as e:
-            logger.error(f"Error disconnecting from IP camera: {e}")
+            logger.error(f"Error disconnecting from video file: {e}")
             return False
     
     def read(self) -> Tuple[bool, Optional[np.ndarray]]:
@@ -121,50 +134,49 @@ class IPCameraCapture(VideoCaptureBase):
             return self._read_direct()
     
     def set_exposure(self, value: float) -> bool:
-        """Set exposure (may not be supported by all IP cameras)."""
-        logger.warning("Exposure control may not be supported by IP cameras")
-        self._exposure = value
+        """Set exposure (not applicable for video files)."""
+        logger.warning("Exposure control not applicable for video files")
         return False
     
     def get_exposure(self) -> Optional[float]:
-        """Get exposure."""
-        return self._exposure
+        """Get exposure (not applicable for video files)."""
+        return None
     
     def set_gain(self, value: float) -> bool:
-        """Set gain (may not be supported by all IP cameras)."""
-        logger.warning("Gain control may not be supported by IP cameras")
-        self._gain = value
+        """Set gain (not applicable for video files)."""
+        logger.warning("Gain control not applicable for video files")
         return False
     
     def get_gain(self) -> Optional[float]:
-        """Get gain."""
-        return self._gain
+        """Get gain (not applicable for video files)."""
+        return None
 
     def enable_auto_exposure(self, enable: bool = True) -> bool:
         """
-        Enable or disable auto exposure (not generally supported for IP cameras).
+        Enable or disable auto exposure (not applicable for video files).
+        
+        Args:
+            enable: True to enable, False to disable
+        
+        Returns:
+            bool: Always False for video files
         """
-        logger.warning("Auto exposure control may not be supported by IP cameras")
+        logger.warning("Auto exposure control not applicable for video files")
         return False
     
     def set_frame_size(self, width: int, height: int) -> bool:
-        """Set frame size (may not be supported by all IP cameras)."""
-        if not self.is_connected or self.cap is None:
-            return False
-        result1 = self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        result2 = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        logger.info(f"Set IP camera resolution to {width}x{height} (success: {result1 and result2})")
-        return result1 and result2
+        """Set frame size (not applicable for video files)."""
+        logger.warning("Setting resolution is not applicable for video files")
+        return False
 
 
 if __name__ == "__main__":
     # Example usage
-    camera = IPCameraCapture(source="rtsp://192.168.1.153:554/h264Preview_01_sub",
-                                 username="admin", password="password")
+    video_file = "path/to/your/video.mp4"  # Replace with your video file path
+    camera = VideoFileCapture(source=video_file, loop=True, real_time=True)
     
     if camera.connect():
-        camera.start()
-        print("IP Camera connected successfully.")
+        print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
@@ -173,8 +185,9 @@ if __name__ == "__main__":
         while camera.is_connected:
             ret, frame = camera.read()
             if ret:
-                cv2.imshow("IP Camera", frame)
-                if cv2.waitKey(1000) & 0xFF == ord('q'):
+                cv2.imshow("Webcam", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-        camera.stop()
         camera.disconnect()
+    else:
+        print("Failed to connect to webcam.")

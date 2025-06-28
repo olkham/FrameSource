@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 import numpy as np
 import logging
-from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

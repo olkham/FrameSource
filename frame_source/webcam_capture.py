@@ -2,7 +2,7 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import cv2
 import logging
-from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
 import platform
 
 # Configure logging

@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import time
 from typing import Optional, Tuple, List
-from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
 import logging
 
 logging.basicConfig(level=logging.INFO)
