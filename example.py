@@ -11,6 +11,10 @@ def test_camera(name, **kwargs):
     
     camera.connect()
 
+    threaded = kwargs.get('threaded', False)
+    if threaded:
+        camera.start()
+
     if camera.is_connected:
 
         exposure_range = camera.get_exposure_range()
@@ -154,6 +158,7 @@ if __name__ == "__main__":
     # test_camera('video_file', source="C:/Users/optane/Desktop/random_concat_20250604_112614.mp4", loop=True)
     # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="password")
     # test_camera('folder', source="C:/Users/optane/Desktop/bird-calls-dataset/images/default", sort_by='date', fps=30, real_time=True, loop=True)
+    # test_camera('screen', x=100, y=100, w=800, h=600, fps=30, threaded=True)
 
     cameras = [
         {'capture_type': 'basler', 'threaded': True},
@@ -161,7 +166,8 @@ if __name__ == "__main__":
         {'capture_type': 'webcam', 'threaded': True},
         {'capture_type': 'ipcam', 'source': "rtsp://192.168.1.153:554/h264Preview_01_sub", 'username': "admin", 'password': "m0nkey", 'threaded': True},
         {'capture_type': 'video_file', 'source': "C:/Users/optane/Desktop/random_concat_20250604_112614.mp4", 'loop': True, 'threaded': True},
-        {'capture_type': 'folder', 'source': "C:/Users/optane/Desktop/bird-calls-dataset/images/default", 'sort_by': 'date', 'fps': 30, 'real_time': True, 'loop': True, 'threaded': False}
+        {'capture_type': 'folder', 'source': "C:/Users/optane/Desktop/bird-calls-dataset/images/default", 'sort_by': 'date', 'fps': 30, 'real_time': True, 'loop': True, 'threaded': False},
+        {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 800, 'h': 600, 'fps': 30, 'threaded': True}
     ]
 
     test_multiple_cameras(cameras, threaded=True)

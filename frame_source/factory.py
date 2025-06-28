@@ -23,6 +23,7 @@ from .webcam_capture import WebcamCapture
 from .ipcamera_capture import IPCameraCapture
 from .video_file_capture import VideoFileCapture
 from .folder_capture import FolderCapture
+from .screen_capture import ScreenCapture
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,7 @@ class FrameSourceFactory:
         'ipcam': IPCameraCapture,
         'ximea': XimeaCapture,
         'basler': BaslerCapture,
+        'screen': ScreenCapture,
     }
     
     @classmethod
