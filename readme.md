@@ -10,7 +10,7 @@ When I work on computer vision, robotics, or video analytics projects, I often n
 
 ## Features ✨
 
-- Unified interface for all frame sources (cameras, video files, image folders)
+- Unified interface for all frame sources (cameras, video files, image folders, screen capture)
 - Easily extensible with new capture types
 - Threaded/background capture support for smooth frame acquisition
 - Control over exposure, gain, resolution, FPS (where supported by the source)
@@ -24,6 +24,7 @@ When I work on computer vision, robotics, or video analytics projects, I often n
 - 🎥 **Video File** (MP4, AVI, etc.)
 - 🗂️ **Folder of Images** (sorted by name or creation time)
 - 🏭 **Industrial Cameras** (e.g., Ximea, Basler, Huateng)
+- 🖼️ **Screen Capture** (live region of your desktop)
 
 ## Installation
 
@@ -77,6 +78,7 @@ cap.disconnect()
 
 ### 2. Direct Use
 
+#### Folder of Images
 ```python
 from frame_source.folder_capture import FolderCapture
 cap = FolderCapture('images/', sort_by='name', width=640, height=480, fps=15, real_time=True, loop=True)
@@ -85,6 +87,20 @@ while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
         break
+cap.disconnect()
+```
+
+#### Screen Capture
+```python
+from frame_source.screen_capture import ScreenCapture
+cap = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
+cap.connect()
+cap.start()  # For background capture (optional)
+while cap.is_connected:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    # process or display frame
 cap.disconnect()
 ```
 
