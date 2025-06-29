@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "framesource"
+# version is set dynamically from frame_source/_version.py
+dynamic = ["version"]
+description = "A flexible, extensible Python framework for acquiring frames from cameras, video files, image folders, and screen capture."
+authors = [
+    { name = "Oliver Hamilton" }
+]
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "opencv-python",
+    "numpy",
+    "mss"
+]
+license = { file = "LICENSE" }
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+[tool.setuptools.dynamic]
+version = {attr = "frame_source._version.__version__"}
