@@ -164,9 +164,9 @@ if __name__ == "__main__":
         {'capture_type': 'basler', 'threaded': True},
         {'capture_type': 'ximea', 'threaded': True},
         {'capture_type': 'webcam', 'threaded': True},
-        {'capture_type': 'ipcam', 'source': "rtsp://192.168.1.153:554/h264Preview_01_sub", 'username': "admin", 'password': "m0nkey", 'threaded': True},
-        {'capture_type': 'video_file', 'source': "C:/Users/optane/Desktop/random_concat_20250604_112614.mp4", 'loop': True, 'threaded': True},
-        {'capture_type': 'folder', 'source': "C:/Users/optane/Desktop/bird-calls-dataset/images/default", 'sort_by': 'date', 'fps': 30, 'real_time': True, 'loop': True, 'threaded': False},
+        {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},
+        {'capture_type': 'video_file', 'source': "media/geti_demo.mp4", 'loop': True, 'threaded': True},
+        {'capture_type': 'folder', 'source': "media/image_seq", 'sort_by': 'date', 'fps': 30, 'real_time': True, 'loop': True, 'threaded': False},
         {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 800, 'h': 600, 'fps': 30, 'threaded': True}
     ]
 

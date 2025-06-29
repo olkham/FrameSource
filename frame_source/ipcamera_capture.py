@@ -36,19 +36,20 @@ class IPCameraCapture(VideoCaptureBase):
 
     def _background_capture(self):
         import time
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set(): # type: ignore
             success, frame = self._read_direct()
             if success:
                 self._latest_frame = frame
             time.sleep(0.01)  # ~100 FPS max, adjust as needed
 
-    def get_latest_frame(self):
+    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Get the most recent frame captured by the background thread.
         Returns:
-            Optional[np.ndarray]: Latest frame or None if not available
+            Tuple[bool, Optional[np.ndarray]]: (success, frame) or (False, None) if not available
         """
-        return getattr(self, '_latest_frame', None)
+        frame = getattr(self, '_latest_frame', None)
+        return (frame is not None), frame
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
@@ -68,8 +69,11 @@ class IPCameraCapture(VideoCaptureBase):
         self.username = username
         self.password = password
         self.cap = None
-        self.stream_url = self._build_stream_url()
-        
+        if username is not None and password is not None:
+            self.stream_url = self._build_stream_url()
+        else:
+            self.stream_url = source
+                
     def _build_stream_url(self) -> str:
         """Build stream URL with authentication if provided."""
         if self.username and self.password:
@@ -109,14 +113,13 @@ class IPCameraCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error disconnecting from IP camera: {e}")
             return False
-    
+        
     def read(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
         """
         if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            frame = self.get_latest_frame()
-            return (frame is not None), frame
+            return self.get_latest_frame()
         else:
             return self._read_direct()
     
