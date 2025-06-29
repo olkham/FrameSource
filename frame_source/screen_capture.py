@@ -4,6 +4,7 @@ import time
 from typing import Optional, Tuple, Any
 from .video_capture_base import VideoCaptureBase
 import logging
+import threading
 
 try:
     import mss
@@ -14,6 +15,27 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class ScreenCapture(VideoCaptureBase):
+    """
+    Capture class for grabbing frames from a region of the screen.
+    Args:
+        x (int): Top-left x coordinate
+        y (int): Top-left y coordinate
+        w (int): Width of region
+        h (int): Height of region
+        fps (float): Target FPS (default 30)
+    """
+    def __init__(self, x: int = 0, y: int = 0, w: int = 640, h: int = 480, fps: float = 30.0, **kwargs):
+        super().__init__(**kwargs)
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.fps = fps
+        self.monitor = {"top": y, "left": x, "width": w, "height": h}
+        self._thread_local = threading.local()
+        self.is_connected = False
+        self.time_of_last_frame = 0.0
+
     def start(self):
         """
         Start background frame capture in a separate thread.
@@ -59,40 +81,16 @@ class ScreenCapture(VideoCaptureBase):
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
         return getattr(self, '_latest_success', False), getattr(self, '_latest_frame', None)
-    """
-    Capture class for grabbing frames from a region of the screen.
-    Args:
-        x (int): Top-left x coordinate
-        y (int): Top-left y coordinate
-        w (int): Width of region
-        h (int): Height of region
-        fps (float): Target FPS (default 30)
-    """
-    def __init__(self, x: int = 0, y: int = 0, w: int = 640, h: int = 480, fps: float = 30.0, **kwargs):
-        super().__init__(**kwargs)
-        self.x = x
-        self.y = y
-        self.w = w
-        self.h = h
-        self.fps = fps
-        self.monitor = {"top": y, "left": x, "width": w, "height": h}
-        self.sct = None
-        self.is_connected = False
-        self.time_of_last_frame = 0.0
 
     def connect(self) -> bool:
         if mss is None:
             logger.error("mss is not installed. Cannot use ScreenCapture.")
             return False
-        self.sct = mss.mss()
         self.is_connected = True
         logger.info(f"ScreenCapture connected to region x={self.x}, y={self.y}, w={self.w}, h={self.h}")
         return True
 
     def disconnect(self) -> bool:
-        if self.sct:
-            self.sct.close()
-            self.sct = None
         self.is_connected = False
         logger.info("ScreenCapture disconnected.")
         return True
@@ -104,9 +102,15 @@ class ScreenCapture(VideoCaptureBase):
         else:
             return self._read_direct()
 
+    def _get_sct(self):
+        if not hasattr(self._thread_local, 'sct') or self._thread_local.sct is None:
+            self._thread_local.sct = mss.mss()
+        return self._thread_local.sct
+
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
-        if not self.is_connected or self.sct is None:
+        if not self.is_connected:
             return False, None
+        sct = self._get_sct()
         # Real-time playback control
         if self.fps > 0:
             frame_duration = 1.0 / self.fps
@@ -115,7 +119,7 @@ class ScreenCapture(VideoCaptureBase):
             if elapsed < frame_duration:
                 time.sleep(frame_duration - elapsed)
             self.time_of_last_frame = time.time()
-        img = np.array(self.sct.grab(self.monitor))
+        img = np.array(sct.grab(self.monitor))
         # Convert BGRA to BGR
         frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         return True, frame
