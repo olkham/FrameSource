@@ -122,6 +122,7 @@ FrameSourceFactory.register_capture_type('my_camera', MyCameraCapture)
 
 - Written by me, with lots of help from GitHub Copilot 🤖
 - OpenCV and other camera SDKs for backend support
+- public RTSP URL from https://github.com/grigory-lobkov/rtsp-camera-view/issues/3
 
 
 ---
