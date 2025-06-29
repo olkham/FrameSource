@@ -143,7 +143,7 @@ class HuatengCapture(VideoCaptureBase):
             max_exp = 31 * 1000
             return (min_exp, max_exp)
         except Exception:
-            return (None, None)
+            return None
 
     def get_gain_range(self) -> Optional[Tuple[float, float]]:
         try:
@@ -151,7 +151,7 @@ class HuatengCapture(VideoCaptureBase):
             max_gain = 6
             return (min_gain, max_gain)
         except Exception:
-            return (None, None)
+            return None
 
     def get_frame_size(self) -> Optional[Tuple[int, int]]:
         if self.prop_frame_width and self.prop_frame_height:
@@ -160,7 +160,8 @@ class HuatengCapture(VideoCaptureBase):
 
     def set_frame_size(self, width: int, height: int) -> bool:
         try:
-            mvsdk.CameraSetImageResolution(self.hCamera, width, height)
+            imageres = mvsdk.tSdkImageResolution(width, height)
+            mvsdk.CameraSetImageResolution(self.hCamera, imageres)
             self.prop_frame_width = width
             self.prop_frame_height = height
             logger.info(f"Set Huateng camera resolution to {width}x{height}")
@@ -191,7 +192,7 @@ if __name__ == "__main__":
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
-            if ret:
+            if ret and frame is not None:
                 cv2.imshow("camera", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break

@@ -34,19 +34,20 @@ class BaslerCapture(VideoCaptureBase):
 
     def _background_capture(self):
         import time
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set(): # type: ignore
             success, frame = self._read_direct()
             if success:
                 self._latest_frame = frame
             time.sleep(0.01)  # ~100 FPS max, adjust as needed
 
-    def get_latest_frame(self):
+    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Get the most recent frame captured by the background thread.
         Returns:
-            Optional[np.ndarray]: Latest frame or None if not available
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
-        return getattr(self, '_latest_frame', None)
+        frame = getattr(self, '_latest_frame', None)
+        return (frame is not None), frame
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
@@ -57,7 +58,7 @@ class BaslerCapture(VideoCaptureBase):
         if not self.is_connected or self.camera is None:
             return False, None
         try:
-            grabResult = self.camera.RetrieveResult(5000, self.pylon.TimeoutHandling_ThrowException)
+            grabResult = self.camera.RetrieveResult(5000, self.pylon.TimeoutHandling_ThrowException) # type: ignore
             if grabResult.GrabSucceeded():
                 if self.converter:
                     image = self.converter.Convert(grabResult)
@@ -177,8 +178,7 @@ class BaslerCapture(VideoCaptureBase):
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
         """
         if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            frame = self.get_latest_frame()
-            return (frame is not None), frame
+            return self.get_latest_frame()
         else:
             return self._read_direct()
     
@@ -331,7 +331,7 @@ if __name__ == "__main__":
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
-            if ret:
+            if ret and frame is not None:
                 cv2.imshow("Webcam", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
