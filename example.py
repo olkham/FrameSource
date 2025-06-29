@@ -155,9 +155,9 @@ if __name__ == "__main__":
     # test_camera('basler')
     # test_camera('ximea')
     # test_camera('webcam', source=0)
-    # test_camera('video_file', source="C:/Users/optane/Desktop/random_concat_20250604_112614.mp4", loop=True)
+    # test_camera('video_file', source="media/geti_demo.mp4", loop=True)
     # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="password")
-    # test_camera('folder', source="C:/Users/optane/Desktop/bird-calls-dataset/images/default", sort_by='date', fps=30, real_time=True, loop=True)
+    # test_camera('folder', source="media/image_seq", sort_by='date', fps=30, real_time=True, loop=True)
     # test_camera('screen', x=100, y=100, w=800, h=600, fps=30, threaded=True)
 
     cameras = [
