@@ -104,6 +104,8 @@ class ScreenCapture(VideoCaptureBase):
 
     def _get_sct(self):
         if not hasattr(self._thread_local, 'sct') or self._thread_local.sct is None:
+            if mss is None:
+                raise RuntimeError("mss is not installed. Cannot create screen capture.")
             self._thread_local.sct = mss.mss()
         return self._thread_local.sct
 

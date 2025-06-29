@@ -44,9 +44,10 @@ class XimeaCapture(VideoCaptureBase):
         """
         Get the most recent frame captured by the background thread.
         Returns:
-            Optional[np.ndarray]: Latest frame or None if not available
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
-        return getattr(self, '_latest_frame', None)
+        frame = getattr(self, '_latest_frame', None)
+        return (frame is not None), frame
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
@@ -54,7 +55,7 @@ class XimeaCapture(VideoCaptureBase):
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
-        if not self.is_connected or self.cam is None:
+        if not self.is_connected or self.cam is None or self.xiapi is None:
             return False, None
         try:
             img = self.xiapi.Image()
@@ -156,36 +157,39 @@ class XimeaCapture(VideoCaptureBase):
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
         """
         if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            frame = self.get_latest_frame()
-            return (frame is not None), frame
+            return self.get_latest_frame()
         else:
             return self._read_direct()
     
     def get_exposure_range(self) -> Optional[Tuple[float, float]]:
         """Get exposure range in microseconds."""
         if not self.is_connected or self.cam is None:
-            return None, None
+            return None
         
         try:
             min_exposure = self.cam.get_exposure_minimum()
             max_exposure = self.cam.get_exposure_maximum()
-            return (min_exposure, max_exposure)
+            if min_exposure is None or max_exposure is None:
+                return None
+            return (float(min_exposure), float(max_exposure))
         except Exception as e:
             logger.error(f"Error getting exposure range: {e}")
-            return None, None
+            return None
         
     def get_gain_range(self) -> Optional[Tuple[float, float]]:
         """Get gain range in dB."""
         if not self.is_connected or self.cam is None:
-            return None, None
+            return None
         
         try:
             min_gain = self.cam.get_gain_minimum()
             max_gain = self.cam.get_gain_maximum()
-            return (min_gain, max_gain)
+            if min_gain is None or max_gain is None:
+                return None
+            return (float(min_gain), float(max_gain))
         except Exception as e:
             logger.error(f"Error getting gain range: {e}")
-            return None, None
+            return None
 
     def set_exposure(self, value: float) -> bool:
         """Set exposure in microseconds."""
@@ -206,7 +210,10 @@ class XimeaCapture(VideoCaptureBase):
             return self._exposure
         
         try:
-            return float(self.cam.get_exposure())
+            exposure_value = self.cam.get_exposure()
+            if exposure_value is not None:
+                return float(exposure_value)
+            return self._exposure
         except Exception:
             return self._exposure
     
@@ -229,7 +236,10 @@ class XimeaCapture(VideoCaptureBase):
             return self._gain
         
         try:
-            return self.cam.get_gain()
+            gain_value = self.cam.get_gain()
+            if gain_value is not None:
+                return float(gain_value)
+            return self._gain
         except Exception:
             return self._gain
 
@@ -277,8 +287,8 @@ if __name__ == "__main__":
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
-            if ret:
-                cv2.imshow("Webcam", frame)
+            if ret or frame is not None:
+                cv2.imshow("Webcam", frame) # type: ignore
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 

@@ -64,7 +64,7 @@ class IPCameraCapture(VideoCaptureBase):
 
     """IP Camera capture using OpenCV with RTSP/HTTP streams."""
     
-    def __init__(self, source: str, username: str = None, password: str = None, **kwargs):
+    def __init__(self, source: str, username: Optional[str] = None, password: Optional[str] = None, **kwargs):
         super().__init__(source, **kwargs)
         self.username = username
         self.password = password
@@ -73,7 +73,7 @@ class IPCameraCapture(VideoCaptureBase):
             self.stream_url = self._build_stream_url()
         else:
             self.stream_url = source
-                
+
     def _build_stream_url(self) -> str:
         """Build stream URL with authentication if provided."""
         if self.username and self.password:
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         while camera.is_connected:
             ret, frame = camera.read()
             if ret:
-                cv2.imshow("IP Camera", frame)
+                cv2.imshow("IP Camera", frame) # type: ignore
                 if cv2.waitKey(1000) & 0xFF == ord('q'):
                     break
         camera.stop()
