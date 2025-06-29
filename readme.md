@@ -71,7 +71,7 @@ while cap.is_connected:
 cap.disconnect()
 
 # Folder of images
-cap = FrameSourceFactory.create('folder', source='images/', sort_by='date', fps=10, loop=True)
+cap = FrameSourceFactory.create('folder', source='media/image_seq', sort_by='date', fps=10, loop=True)
 cap.connect()
 cap.start()  # For background capture
 while cap.is_connected:
@@ -86,7 +86,7 @@ cap.disconnect()
 #### Folder of Images
 ```python
 from frame_source.folder_capture import FolderCapture
-cap = FolderCapture('images/', sort_by='name', width=640, height=480, fps=15, real_time=True, loop=True)
+cap = FolderCapture('media/image_seq', sort_by='name', width=640, height=480, fps=15, real_time=True, loop=True)
 cap.connect()
 while cap.is_connected:
     ret, frame = cap.read()
