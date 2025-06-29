@@ -34,5 +34,8 @@ minversion = "6.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
 
+[tool.setuptools]
+packages = ["frame_source"]
+
 [tool.setuptools.dynamic]
 version = {attr = "frame_source._version.__version__"}
