@@ -1,12 +1,14 @@
-from typing import Optional, Tuple, Any
-import numpy as np
 import logging
+from typing import Optional, Tuple, Any
+
+import numpy as np
+
 from .video_capture_base import VideoCaptureBase
-from genicam.gentl import TimeoutException
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class GenicamCapture(VideoCaptureBase):
     def start(self):
@@ -14,7 +16,6 @@ class GenicamCapture(VideoCaptureBase):
         Start background thread to continuously capture frames from a Genicam compliant camera.
         """
         import threading
-        import time
         if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
             return  # Already running
         self._stop_event = threading.Event()
@@ -35,11 +36,13 @@ class GenicamCapture(VideoCaptureBase):
 
     def _background_capture(self):
         import time
-        while not self._stop_event.is_set(): # type: ignore
+        while not self._stop_event.is_set():  # type: ignore
             success, frame = self._read_direct()
             if success:
                 self._latest_frame = frame
-            time.sleep(0.01)  # ~100 FPS max, adjust as needed
+                # print(self._latest_frame.mean())
+
+            time.sleep(1 / self.fps)
 
     def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
@@ -51,10 +54,12 @@ class GenicamCapture(VideoCaptureBase):
         return (frame is not None), frame
 
     @staticmethod
-    def to_np(buffer):
+    def buffer_to_numpy(buffer):
         from harvesters.util.pfnc import mono_location_formats, \
             rgb_formats, bgr_formats, \
-            rgba_formats, bgra_formats, bayer_location_formats
+            rgba_formats, bgra_formats, bayer_location_formats, lmn_422_location_formats, \
+            lmn_422_packed_location_formats, lmn_411_location_formats
+        import cv2
 
         payload = buffer.payload
         component = payload.components[0]
@@ -62,28 +67,30 @@ class GenicamCapture(VideoCaptureBase):
         height = component.height
         data_format = component.data_format
 
-        # Reshape the image so that it can be drawn on the VisPy canvas:
         if data_format in mono_location_formats:
             content = component.data.reshape(height, width)
         else:
-            # The image requires you to reshape it to draw it on the
-            # canvas:
             if data_format in rgb_formats or \
                     data_format in rgba_formats or \
                     data_format in bgr_formats or \
                     data_format in bgra_formats or \
                     data_format in bayer_location_formats:
-                #
-                content = np.copy(component.data.reshape(
+
+                content = component.data.reshape(
                     height, width,
-                    int(component.num_components_per_pixel)  # Set of R, G, B, and Alpha
-                ))
-                #
+                    int(component.num_components_per_pixel)
+                )
+
+                if data_format in bayer_location_formats:
+                    content = cv2.cvtColor(content, cv2.COLOR_BayerGR2RGB)
+
                 if data_format in rgb_formats:
-                    # Swap every R and B:
                     content = content[:, :, ::-1]
-            else:
-                ycbcr422_data = np.copy(component.data.reshape((-1, 4)))
+            elif data_format in lmn_422_location_formats or \
+                    data_format in lmn_422_packed_location_formats or \
+                    data_format in lmn_411_location_formats:
+
+                ycbcr422_data = component.data.reshape((-1, 4))
 
                 Y0 = ycbcr422_data[:, 0].astype(np.float32)
                 Cb = ycbcr422_data[:, 1].astype(np.float32)
@@ -118,13 +125,9 @@ class GenicamCapture(VideoCaptureBase):
                 # Stack into final image
                 rgb_image = np.stack((B, G, R), axis=-1).reshape((height, width, 3))
                 return rgb_image
+            else:
+                raise NotImplementedError(f"Unsupported pixel data format `{data_format}`")
         return content
-
-    def release_buffers(self):
-        for _buffer in self._buffers:
-            if _buffer:
-                _buffer.queue()
-        self._buffers.clear()
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
@@ -132,17 +135,19 @@ class GenicamCapture(VideoCaptureBase):
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
+        from genicam.gentl import TimeoutException
+
         if not self.is_connected or self.camera is None:
             return False, None
         try:
-            buffer = self.camera.fetch(timeout=0.0001)
-            # self._prepare_texture(buffer)
+            n = self.camera.remote_device.node_map
+            n.TriggerSoftware.execute()
 
+            self.camera = self.camera
+            buffer = self.camera.fetch(timeout=3)
+            nump = self.buffer_to_numpy(buffer)
 
-            nump = self.to_np(buffer)
-
-            self.release_buffers()
-            self._buffers.append(buffer)
+            buffer.queue()
 
             return True, nump
         except TimeoutException:
@@ -151,11 +156,9 @@ class GenicamCapture(VideoCaptureBase):
             return False, None
         except Exception as e:
             logger.error(f"Error reading from Genicam camera: {e}")
-            raise e
             return False, None
 
     """Genicam camera capture using pypylon."""
-    
     def __init__(self, source: Any = None, **kwargs):
         super().__init__(source, **kwargs)
         self.camera = None
@@ -170,55 +173,58 @@ class GenicamCapture(VideoCaptureBase):
         self.is_mono = kwargs.get('is_mono', False)
         self.serial_number = source if isinstance(source, str) else None
         self.device_index = source if isinstance(source, int) else 0
-        self._buffers = []
+        self.fps = self.config.get("fps",60)
+
+    def try_set_node_param(self, container, param_name, attr_name, value):
+        try:
+            param = getattr(container, param_name)
+            setattr(param, attr_name, value)
+            print(f"Set {param_name}.{attr_name} to {value}")
+        except Exception as e:
+            print(f"Failed to set {param_name} to {value}: {e}")
 
     def connect(self) -> bool:
         """Connect to Genicam camera."""
         if self.h is None:
             logger.error("Harvesters not available")
             return False
-        
+
         try:
-            self.h.add_file('/opt/pylon/lib/gentlproducer/gtl/ProducerU3V.cti')
-            # h.add_file('/opt/pylon/lib/gentlproducer/gtl/ProducerGEV.cti')
-            # h.add_file('/usr/lib/ids/cti/ids_gevgentl.cti')
-            # h.add_file('/usr/lib/ids/cti/ids_u3vgentl.cti')
-            self.h.add_file('/usr/lib/ids/cti/ids_ueyegentl.cti')
+            # self.h.add_file('/opt/pylon/lib/gentlproducer/gtl/ProducerU3V.cti')
+
+            cti_files = self.config.get("cti_files",[])
+            for cti_file in cti_files:
+                self.h.add_file(cti_file)
             self.h.update()
-            self._buffers = []
 
             devices = self.h.device_info_list
 
             if len(devices) == 0:
                 logger.error("No Genicam cameras found")
                 return False
-            
+
             # Create camera object
             if self.serial_number:
                 self.camera = self.h.create({'serial_number': self.serial_number})
             else:
                 self.camera = self.h.create(self.device_index)
-            
+
             # Open camera
             n = self.camera.remote_device.node_map
-            # Change camera properties to listen for Bruker TTL triggers
-            # n.TriggerSelector.value = "SingleFrameTrigger" <-- currently not changeable...
-            n.TriggerMode.value = "Off"
-            n.TriggerActivation.value = "RisingEdge"
-            n.TriggerSource.value = "Line2"
-            n.LineSelector.value = "Line2"
 
+            # Try to configure the camera in more suitable settings
+            self.try_set_node_param(n, "TriggerMode", "value", "On")
+            self.try_set_node_param(n, "TriggerActivation", "value", "RisingEdge")
+            self.try_set_node_param(n, "TriggerSource", "value", "Software")
+            self.try_set_node_param(n, "PixelFormat", "value", "BayerGR8")
+            self.try_set_node_param(n, "BinningHorizontal", "value", 1)
+            self.try_set_node_param(n, "BinningVertical", "value", 1)
 
-            self.camera.start()
-            
-            # # Create image converter for color images
-            # self.converter = self.pylon.ImageFormatConverter()
-            # if self.is_mono:
-            #     self.converter.OutputPixelFormat = self.pylon.PixelType_Mono8
-            # else:
-            #     self.converter.OutputPixelFormat = self.pylon.PixelType_BGR8packed
-            # self.converter.OutputBitAlignment = self.pylon.OutputBitAlignment_MsbAligned
-            
+            # from genicam_tools import GenicamTools
+            # node_map = GenicamTools.print_node_map(n)
+
+            self.is_connected = True
+
             # Apply config parameters
             if 'exposure' in self.config:
                 self.set_exposure(self.config['exposure'])
@@ -226,17 +232,22 @@ class GenicamCapture(VideoCaptureBase):
                 self.set_gain(self.config['gain'])
             if 'width' in self.config and 'height' in self.config:
                 self.set_frame_size(self.config['width'], self.config['height'])
-            
+            if 'x' in self.config or 'y' in self.config:
+                self.set_offset(self.config.get('x', 0), self.config.get('y', 0))
+            if 'fps' in self.config:
+                self.fps = self.config['fps']
+            if 'acquisition_framerate' in self.config:
+                self.set_fps(self.config['acquisition_framerate'])
 
-            self.is_connected = True
+            self.camera.start()
 
-            logger.info(f"Connected to Genicam camera {self.camera.device.module.model}")
+            logger.info(f"Connected to Genicam camera {self.camera.device.module.vendor} {self.camera.device.module.model}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error connecting to Genicam camera: {e}")
             return False
-    
+
     def disconnect(self) -> bool:
         """Disconnect from Genicam camera."""
         try:
@@ -247,7 +258,7 @@ class GenicamCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error disconnecting from Genicam camera: {e}")
             return False
-    
+
     def read(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
@@ -256,139 +267,175 @@ class GenicamCapture(VideoCaptureBase):
             return self.get_latest_frame()
         else:
             return self._read_direct()
-    
+
     def get_exposure_range(self) -> Tuple[float, float]:
         """Get exposure range in microseconds."""
         if not self.is_connected or self.camera is None:
             return (0.0, 0.0)
-        
+
         try:
-            min_exposure = self.camera.ExposureTime.GetMin()
-            max_exposure = self.camera.ExposureTime.GetMax()
+            n = self.camera.remote_device.node_map
+
+            min_exposure = n.ExposureTime.min
+            max_exposure = n.ExposureTime.max
             return (min_exposure, max_exposure)
         except Exception as e:
             logger.error(f"Error getting exposure range: {e}")
             return (0.0, 0.0)
-        
+
     def get_gain_range(self) -> Tuple[float, float]:
         """Get gain range in dB."""
         if not self.is_connected or self.camera is None:
             return (0.0, 0.0)
-        
+
         try:
-            min_gain = self.camera.Gain.GetMin()
-            max_gain = self.camera.Gain.GetMax()
+            n = self.camera.remote_device.node_map
+
+            min_gain = n.Gain.min
+            max_gain = n.Gain.max
             return (min_gain, max_gain)
         except Exception as e:
             logger.error(f"Error getting gain range: {e}")
             return (0.0, 0.0)
 
-
     def set_exposure(self, value: float) -> bool:
         """Set exposure in microseconds."""
         if not self.is_connected or self.camera is None:
             return False
-        
+
         try:
-            self.camera.ExposureTime.SetValue(value)
+            n = self.camera.remote_device.node_map
+
+            n.ExposureTime.value = value
             self._exposure = value
             return True
         except Exception as e:
             logger.error(f"Error setting exposure: {e}")
             return False
-    
+
     def get_exposure(self) -> Optional[float]:
         """Get exposure in microseconds."""
         if not self.is_connected or self.camera is None:
             return self._exposure
-        
+
         try:
-            return self.camera.ExposureTime.value
+            n = self.camera.remote_device.node_map
+
+            return n.ExposureTime.value
         except Exception:
             return self._exposure
-    
+
     def set_gain(self, value: float) -> bool:
         """Set gain in dB."""
         if not self.is_connected or self.camera is None:
             return False
         try:
-            self.camera.Gain.SetValue(value)
+            n = self.camera.remote_device.node_map
+            n.Gain.value = value
+
             self._gain = value
             return True
         except Exception as e:
             logger.error(f"Error setting gain: {e}")
             return False
-    
+
     def get_gain(self) -> Optional[float]:
         """Get gain in dB."""
         if not self.is_connected or self.camera is None:
             return self._gain
-        
+
         try:
-            return self.camera.Gain.GetValue()
+            n = self.camera.remote_device.node_map
+
+            return n.Gain.value
         except Exception:
             return self._gain
-    
+
     def enable_auto_exposure(self, enable: bool = True) -> bool:
         """Enable or disable auto exposure for Genicam camera."""
         if not self.is_connected or self.camera is None:
             return False
         try:
+            n = self.camera.remote_device.node_map
             if enable:
-                self.camera.ExposureAuto.SetValue("Continuous")
+                n.ExposureAuto.value = "Continuous"
+                n.GainAuto.value = "Continuous"
             else:
-                self.camera.ExposureAuto.SetValue("Off")
+                n.ExposureAuto.value = "Off"
+                n.GainAuto.value = "Off"
             logger.info(f"Set Genicam auto exposure to {enable}")
             return True
         except Exception as e:
             logger.error(f"Error setting Genicam auto exposure: {e}")
             return False
-    
+
     def set_frame_size(self, width: int, height: int) -> bool:
         """Set frame size for Genicam camera."""
         if not self.is_connected or self.camera is None:
             return False
         try:
-            self.camera.Width.SetValue(width)
-            self.camera.Height.SetValue(height)
+            n = self.camera.remote_device.node_map
+
+            n.Width.value = width
+            n.Height.value = height
             logger.info(f"Set Genicam camera resolution to {width}x{height}")
             return True
         except Exception as e:
             logger.error(f"Error setting Genicam camera resolution: {e}")
             return False
-    
+
+    def set_offset(self, x: int, y: int) -> bool:
+        """Set offset for Genicam camera."""
+        if not self.is_connected or self.camera is None:
+            return False
+        try:
+            n = self.camera.remote_device.node_map
+
+            n.OffsetX.value = x
+            n.OffsetY.value = y
+            logger.info(f"Set Genicam offset to ({x},{y})")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting Genicam camera offset: {e}")
+            return False
+
     def get_frame_size(self) -> Optional[Tuple[int, int]]:
         """Get frame size."""
         if not self.is_connected or self.camera is None:
             return None
-        
+
         try:
-            width = self.camera.Width.GetValue()
-            height = self.camera.Height.GetValue()
+            n = self.camera.remote_device.node_map
+
+            width = n.Width.value
+            height = n.Height.value
             return (width, height)
         except Exception:
             return None
-    
+
     def set_fps(self, fps: float) -> bool:
         """Set FPS for Genicam camera."""
         if not self.is_connected or self.camera is None:
             return False
         try:
-            self.camera.AcquisitionFrameRateEnable.SetValue(True)
-            self.camera.AcquisitionFrameRate.SetValue(fps)
+            n = self.camera.remote_device.node_map
+
+            n.AcquisitionFrameRateEnable.value = True
+            n.AcquisitionFrameRate.value = fps
             logger.info(f"Set Genicam camera FPS to {fps}")
             return True
         except Exception as e:
             logger.error(f"Error setting Genicam camera FPS: {e}")
             return False
-    
+
     def get_fps(self) -> Optional[float]:
         """Get FPS."""
         if not self.is_connected or self.camera is None:
             return None
-        
+
         try:
-            return self.camera.AcquisitionFrameRate.GetValue()
+            n = self.camera.remote_device.node_map
+            return n.AcquisitionFrameRate.value
         except Exception:
             return None
 
@@ -396,13 +443,14 @@ class GenicamCapture(VideoCaptureBase):
 if __name__ == "__main__":
     # Example usage
     import cv2
+
     camera = GenicamCapture()  # Replace with actual serial number or index
     if camera.connect():
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()

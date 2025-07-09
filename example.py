@@ -277,8 +277,12 @@ def test_360_camera(name, **kwargs):
 def test_camera(name, **kwargs):
     # Example 1: Webcam capture
     cv2.namedWindow("camera", cv2.WINDOW_NORMAL)
-    print("Testing Webcam Capture:")
-    camera = FrameSourceFactory.create(name, **kwargs)
+    print(f"Testing {name} Capture:")
+    if isinstance(name, str):
+        camera = FrameSourceFactory.create(name, **kwargs)
+    else:
+        camera = name
+
     camera.connect()
 
     threaded = kwargs.get('threaded', False)
@@ -298,7 +302,7 @@ def test_camera(name, **kwargs):
             min_exp, max_exp = exposure_range
         else:
             min_exp, max_exp = None, None
-            
+
         gain_range = camera.get_gain_range()
         if gain_range is not None:
             min_gain, max_gain = gain_range
@@ -309,7 +313,7 @@ def test_camera(name, **kwargs):
         try:
             # Enable auto gain only while keeping exposure fixed
             camera.enable_auto_exposure(True)  # Enable auto exposure/gain
-            
+
             print("Auto exposure/gain configured: exposure locked, gain variable")
         except Exception as e:
             print(f"Error configuring Ximea auto exposure/gain: {e}")
@@ -318,7 +322,7 @@ def test_camera(name, **kwargs):
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
@@ -376,9 +380,8 @@ def test_camera(name, **kwargs):
     camera.disconnect()
 
 
-def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
+def test_multiple_cameras(cameras: List[Any], threaded: bool = True):
     """Test connecting to multiple different cameras types and viewing them live concurrently."""
-    
 
     capture_instances = []
     grid_cols = 3
@@ -396,7 +399,7 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
         row = idx // grid_cols
         x = col * win_w
         y = row * win_h
-        cv2.moveWindow(f"{name}", x, y+(25* row))  # Add some vertical spacing
+        cv2.moveWindow(f"{name}", x, y + (25 * row))  # Add some vertical spacing
         print(f"Testing {name} Capture:")
         camera = FrameSourceFactory.create(name, **cam_cfg)
         if camera.connect():
@@ -429,6 +432,17 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
 
 # Example usage and testing
 if __name__ == "__main__":
+
+    from frame_source.genicam_capture import GenicamCapture
+
+    cti_files = ['/Library/Frameworks/pylon.framework/Versions/A/Libraries/gentlproducer/gtl/ProducerU3V.cti']
+    # '/opt/pylon/lib/gentlproducer/gtl/ProducerGEV.cti',
+    # '/usr/lib/ids/cti/ids_gevgentl.cti',
+    # '/usr/lib/ids/cti/ids_u3vgentl.cti',
+    # '/usr/lib/ids/cti/ids_ueyegentl.cti']
+
+    genicam = GenicamCapture(0, width=1280, height=960, x=0, y=0, cti_files=cti_files, threaded=True)
+    test_camera(genicam)
 
      test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
                             sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive',
