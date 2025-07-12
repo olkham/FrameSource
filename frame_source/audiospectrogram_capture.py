@@ -62,6 +62,17 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         self.frame_rate = kwargs.get('frame_rate', 30)
         self.audio_buffer_size = kwargs.get('audio_buffer_size', 1024)
         
+        # Contrast enhancement parameters
+        self.contrast_method = kwargs.get('contrast_method', 'fixed')  # 'fixed', 'adaptive', 'percentile'
+        self.adaptive_alpha = kwargs.get('adaptive_alpha', 0.95)  # Smoothing factor for adaptive normalization
+        self.percentile_range = kwargs.get('percentile_range', (5, 95))  # Percentile range for normalization
+        self.gamma_correction = kwargs.get('gamma_correction', 1.0)  # Gamma correction for contrast
+        self.noise_floor = kwargs.get('noise_floor', -70)  # Noise floor in dB
+        
+        # Adaptive normalization state
+        self._adaptive_min = None
+        self._adaptive_max = None
+        
         # Validate and adjust sample rate based on frequency range
         max_freq = self.freq_range[1]
         nyquist_freq = self.sample_rate / 2
@@ -350,9 +361,23 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         # Convert to dB
         mel_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
         
-        # Normalize to 0-255 range
-        mel_normalized = np.clip((mel_db - self.db_range[0]) / (self.db_range[1] - self.db_range[0]), 0, 1)
-        mel_uint8 = (mel_normalized * 255).astype(np.uint8)
+        # Apply noise floor
+        mel_db = np.maximum(mel_db, self.noise_floor)
+        
+        # Apply contrast enhancement based on method
+        if self.contrast_method == 'adaptive':
+            mel_normalized = self._adaptive_normalize(mel_db)
+        elif self.contrast_method == 'percentile':
+            mel_normalized = self._percentile_normalize(mel_db)
+        else:  # 'fixed'
+            mel_normalized = self._fixed_normalize(mel_db)
+        
+        # Apply gamma correction for additional contrast control
+        if self.gamma_correction != 1.0:
+            mel_normalized = np.power(mel_normalized, self.gamma_correction)
+        
+        # Convert to uint8
+        mel_uint8 = (np.clip(mel_normalized, 0, 1) * 255).astype(np.uint8)
         
         # Flip vertically (high frequencies at top)
         mel_uint8 = np.flipud(mel_uint8)
@@ -481,6 +506,91 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         """Get the current colormap (None means grayscale)."""
         return self.colormap
 
+    def set_contrast_method(self, method: str) -> bool:
+        """
+        Set the contrast enhancement method.
+        
+        Args:
+            method: 'fixed', 'adaptive', or 'percentile'
+            
+        Returns:
+            bool: True if successful
+        """
+        if method in ['fixed', 'adaptive', 'percentile']:
+            self.contrast_method = method
+            # Reset adaptive state when changing methods
+            if method == 'adaptive':
+                self._adaptive_min = None
+                self._adaptive_max = None
+            logger.info(f"Contrast method set to {method}")
+            return True
+        else:
+            logger.warning(f"Invalid contrast method: {method}. Use 'fixed', 'adaptive', or 'percentile'")
+            return False
+    
+    def get_contrast_method(self) -> str:
+        """Get the current contrast enhancement method."""
+        return self.contrast_method
+    
+    def set_gamma_correction(self, gamma: float) -> bool:
+        """
+        Set gamma correction value for contrast enhancement.
+        
+        Args:
+            gamma: Gamma value (< 1.0 increases contrast, > 1.0 decreases contrast)
+            
+        Returns:
+            bool: True if successful
+        """
+        if gamma > 0:
+            self.gamma_correction = gamma
+            logger.info(f"Gamma correction set to {gamma}")
+            return True
+        return False
+    
+    def get_gamma_correction(self) -> float:
+        """Get the current gamma correction value."""
+        return self.gamma_correction
+    
+    def set_noise_floor(self, noise_floor_db: float) -> bool:
+        """
+        Set the noise floor in dB to suppress background noise.
+        
+        Args:
+            noise_floor_db: Noise floor in dB (e.g., -70)
+            
+        Returns:
+            bool: True if successful
+        """
+        self.noise_floor = noise_floor_db
+        logger.info(f"Noise floor set to {noise_floor_db} dB")
+        return True
+    
+    def get_noise_floor(self) -> float:
+        """Get the current noise floor in dB."""
+        return self.noise_floor
+    
+    def set_percentile_range(self, low: float, high: float) -> bool:
+        """
+        Set the percentile range for percentile-based normalization.
+        
+        Args:
+            low: Lower percentile (0-100)
+            high: Upper percentile (0-100)
+            
+        Returns:
+            bool: True if successful
+        """
+        if 0 <= low < high <= 100:
+            self.percentile_range = (low, high)
+            logger.info(f"Percentile range set to {self.percentile_range}")
+            return True
+        return False
+    
+    def get_percentile_range(self) -> Tuple[float, float]:
+        """Get the current percentile range."""
+        return self.percentile_range
+
     def validate_frequency_range(self, min_freq: float, max_freq: float) -> Tuple[bool, str]:
         """
         Validate if the frequency range is supported by the current configuration.
@@ -519,3 +629,65 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     def get_gain(self) -> Optional[float]:
         """Audio gain control could be implemented here."""
         return None
+    
+    def _fixed_normalize(self, mel_db: np.ndarray) -> np.ndarray:
+        """
+        Apply fixed dB range normalization.
+        
+        Args:
+            mel_db: Mel spectrogram in dB
+            
+        Returns:
+            np.ndarray: Normalized spectrogram [0, 1]
+        """
+        return np.clip((mel_db - self.db_range[0]) / (self.db_range[1] - self.db_range[0]), 0, 1)
+    
+    def _adaptive_normalize(self, mel_db: np.ndarray) -> np.ndarray:
+        """
+        Apply adaptive normalization based on current frame statistics.
+        
+        Args:
+            mel_db: Mel spectrogram in dB
+            
+        Returns:
+            np.ndarray: Normalized spectrogram [0, 1]
+        """
+        # Initialize adaptive min/max values
+        if self._adaptive_min is None or self._adaptive_max is None:
+            self._adaptive_min = np.min(mel_db)
+            self._adaptive_max = np.max(mel_db)
+        
+        # Update adaptive min/max values using exponential moving average
+        current_min = np.min(mel_db)
+        current_max = np.max(mel_db)
+        
+        self._adaptive_min = self.adaptive_alpha * self._adaptive_min + (1 - self.adaptive_alpha) * current_min
+        self._adaptive_max = self.adaptive_alpha * self._adaptive_max + (1 - self.adaptive_alpha) * current_max
+        
+        # Ensure we don't divide by zero
+        range_val = max(self._adaptive_max - self._adaptive_min, 1e-10)
+        
+        # Normalize
+        normalized = (mel_db - self._adaptive_min) / range_val
+        return np.clip(normalized, 0, 1)
+    
+    def _percentile_normalize(self, mel_db: np.ndarray) -> np.ndarray:
+        """
+        Apply percentile-based normalization for robust contrast.
+        
+        Args:
+            mel_db: Mel spectrogram in dB
+            
+        Returns:
+            np.ndarray: Normalized spectrogram [0, 1]
+        """
+        # Calculate percentiles
+        low_percentile = np.percentile(mel_db, self.percentile_range[0])
+        high_percentile = np.percentile(mel_db, self.percentile_range[1])
+        
+        # Ensure we don't divide by zero
+        range_val = max(high_percentile - low_percentile, 1e-10)
+        
+        # Normalize
+        normalized = (mel_db - low_percentile) / range_val
+        return np.clip(normalized, 0, 1)

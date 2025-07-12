@@ -1,8 +1,8 @@
 import cv2
 from typing import Any, List
 from frame_source import FrameSourceFactory
-
 from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+
 
 def test_audio_spectrogram(source=None, **kwargs):
     """Test audio spectrogram capture from microphone or audio file."""
@@ -20,9 +20,9 @@ def test_audio_spectrogram(source=None, **kwargs):
         **kwargs
     }
     
-    camera = FrameSourceFactory.create('audio_spectrogram', source=source, **audio_params)
+    frame_source = FrameSourceFactory.create('audio_spectrogram', source=source, **audio_params)
     
-    if not camera.connect():
+    if not frame_source.connect():
         print("Failed to connect to audio source")
         return
     
@@ -30,26 +30,34 @@ def test_audio_spectrogram(source=None, **kwargs):
     print(f"Running in {'threaded' if threaded else 'blocking'} mode")
     
     if threaded:
-        camera.start()
+        frame_source.start()
         print("Started background spectrogram capture thread")
 
-    if camera.is_connected:
+    if frame_source.is_connected:
         print(f"Audio spectrogram params:")
-        print(f"  Frame size: {camera.get_frame_size()}")
-        print(f"  FPS: {camera.get_fps()}")
+        print(f"  Frame size: {frame_source.get_frame_size()}")
+        print(f"  FPS: {frame_source.get_fps()}")
         # Audio-specific parameters (type check since not all cameras have these)
-        if hasattr(camera, 'get_n_mels'):
-            print(f"  N mels: {camera.get_n_mels()}")
-        if hasattr(camera, 'get_window_duration'):
-            print(f"  Window duration: {camera.get_window_duration()}s")
-        if hasattr(camera, 'get_freq_range'):
-            print(f"  Frequency range: {camera.get_freq_range()}")
-        if hasattr(camera, 'get_sample_rate'):
-            print(f"  Sample rate: {camera.get_sample_rate()}Hz")
-        if hasattr(camera, 'get_nyquist_frequency'):
-            print(f"  Nyquist frequency (max): {camera.get_nyquist_frequency()}Hz")
-        if hasattr(camera, 'get_fft_size'):
-            print(f"  FFT size: {camera.get_fft_size()}")
+        if hasattr(frame_source, 'get_n_mels'):
+            print(f"  N mels: {frame_source.get_n_mels()}") # type: ignore
+        if hasattr(frame_source, 'get_window_duration'):
+            print(f"  Window duration: {frame_source.get_window_duration()}s") # type: ignore
+        if hasattr(frame_source, 'get_freq_range'):
+            print(f"  Frequency range: {frame_source.get_freq_range()}") # type: ignore
+        if hasattr(frame_source, 'get_sample_rate'):
+            print(f"  Sample rate: {frame_source.get_sample_rate()}Hz") # type: ignore
+        if hasattr(frame_source, 'get_nyquist_frequency'):
+            print(f"  Nyquist frequency (max): {frame_source.get_nyquist_frequency()}Hz") # type: ignore
+        if hasattr(frame_source, 'get_fft_size'):
+            print(f"  FFT size: {frame_source.get_fft_size()}") # type: ignore
+        if hasattr(frame_source, 'get_contrast_method'):
+            print(f"  Contrast method: {frame_source.get_contrast_method()}") # type: ignore
+        if hasattr(frame_source, 'get_gamma_correction'):
+            print(f"  Gamma correction: {frame_source.get_gamma_correction():.2f}") # type: ignore
+        if hasattr(frame_source, 'get_noise_floor'):
+            print(f"  Noise floor: {frame_source.get_noise_floor()} dB") # type: ignore
+        if hasattr(frame_source, 'get_percentile_range'):
+            print(f"  Percentile range: {frame_source.get_percentile_range()}%") # type: ignore
         
         print("\nKey controls:")
         print("  ESC - Quit")
@@ -61,9 +69,13 @@ def test_audio_spectrogram(source=None, **kwargs):
         print("  4 - Hot colormap")
         print("  5 - Jet colormap")
         print("  +/- - Adjust mel bands")
+        print("  c - Cycle contrast methods (fixed/adaptive/percentile)")
+        print("  g/G - Decrease/increase gamma correction")
+        print("  n/N - Decrease/increase noise floor")
+        print("  p/P - Adjust percentile range")
         
-        while camera.is_connected:
-            ret, frame = camera.read()
+        while frame_source.is_connected:
+            ret, frame = frame_source.read()
             if ret and frame is not None:
                 cv2.imshow("Audio Spectrogram", frame)
                 
@@ -82,40 +94,91 @@ def test_audio_spectrogram(source=None, **kwargs):
                 print("  5 - Jet colormap")
                 print("  + - Increase mel bands (requires restart)")
                 print("  - - Decrease mel bands (requires restart)")
-            elif key == ord('0') and hasattr(camera, 'set_colormap'):
-                camera.set_colormap(None)
+                print("  c - Cycle contrast methods (fixed/adaptive/percentile)")
+                print("  g/G - Decrease/increase gamma correction")
+                print("  n/N - Decrease/increase noise floor")
+                print("  p/P - Adjust percentile range")
+            elif key == ord('0') and hasattr(frame_source, 'set_colormap'):
+                frame_source.set_colormap(None) # type: ignore
                 print("Colormap: Grayscale")
-            elif key == ord('1') and hasattr(camera, 'set_colormap'):
-                camera.set_colormap(cv2.COLORMAP_VIRIDIS)
+            elif key == ord('1') and hasattr(frame_source, 'set_colormap'):
+                frame_source.set_colormap(cv2.COLORMAP_VIRIDIS) # type: ignore
                 print("Colormap: Viridis")
-            elif key == ord('2') and hasattr(camera, 'set_colormap'):
-                camera.set_colormap(cv2.COLORMAP_PLASMA)
+            elif key == ord('2') and hasattr(frame_source, 'set_colormap'):
+                frame_source.set_colormap(cv2.COLORMAP_PLASMA) # type: ignore
                 print("Colormap: Plasma")
-            elif key == ord('3') and hasattr(camera, 'set_colormap'):
-                camera.set_colormap(cv2.COLORMAP_INFERNO)
+            elif key == ord('3') and hasattr(frame_source, 'set_colormap'):
+                frame_source.set_colormap(cv2.COLORMAP_INFERNO) # type: ignore
                 print("Colormap: Inferno")
-            elif key == ord('4') and hasattr(camera, 'set_colormap'):
-                camera.set_colormap(cv2.COLORMAP_HOT)
+            elif key == ord('4') and hasattr(frame_source, 'set_colormap'):
+                frame_source.set_colormap(cv2.COLORMAP_HOT) # type: ignore
                 print("Colormap: Hot")
-            elif key == ord('5') and hasattr(camera, 'set_colormap'):
-                camera.set_colormap(cv2.COLORMAP_JET)
+            elif key == ord('5') and hasattr(frame_source, 'set_colormap'):
+                frame_source.set_colormap(cv2.COLORMAP_JET) # type: ignore
                 print("Colormap: Jet")
             elif key == ord('+') or key == ord('='):
-                if hasattr(camera, 'get_n_mels') and hasattr(camera, 'set_n_mels'):
-                    current_mels = camera.get_n_mels()
-                    camera.set_n_mels(min(current_mels + 16, 256))
-                    print(f"Mel bands: {camera.get_n_mels()} (restart to apply)")
+                if hasattr(frame_source, 'get_n_mels') and hasattr(frame_source, 'set_n_mels'):
+                    current_mels = frame_source.get_n_mels() # type: ignore
+                    frame_source.set_n_mels(min(current_mels + 16, 256)) # type: ignore
+                    print(f"Mel bands: {frame_source.get_n_mels()} (restart to apply)") # type: ignore
             elif key == ord('-'):
-                if hasattr(camera, 'get_n_mels') and hasattr(camera, 'set_n_mels'):
-                    current_mels = camera.get_n_mels()
-                    camera.set_n_mels(max(current_mels - 16, 32))
-                    print(f"Mel bands: {camera.get_n_mels()} (restart to apply)")
+                if hasattr(frame_source, 'get_n_mels') and hasattr(frame_source, 'set_n_mels'):
+                    current_mels = frame_source.get_n_mels() # type: ignore
+                    frame_source.set_n_mels(max(current_mels - 16, 32)) # type: ignore
+                    print(f"Mel bands: {frame_source.get_n_mels()} (restart to apply)") # type: ignore
+            elif key == ord('c'):  # Cycle contrast methods
+                if hasattr(frame_source, 'get_contrast_method') and hasattr(frame_source, 'set_contrast_method'):
+                    current_method = frame_source.get_contrast_method() # type: ignore
+                    methods = ['fixed', 'adaptive', 'percentile']
+                    current_index = methods.index(current_method)
+                    next_method = methods[(current_index + 1) % len(methods)]
+                    frame_source.set_contrast_method(next_method) # type: ignore
+                    print(f"Contrast method: {next_method}")
+            elif key == ord('g'):  # Decrease gamma
+                if hasattr(frame_source, 'get_gamma_correction') and hasattr(frame_source, 'set_gamma_correction'):
+                    current_gamma = frame_source.get_gamma_correction() # type: ignore
+                    new_gamma = max(current_gamma - 0.1, 0.1)
+                    frame_source.set_gamma_correction(new_gamma) # type: ignore
+                    print(f"Gamma correction: {new_gamma:.2f} ({'more contrast' if new_gamma < 1.0 else 'less contrast'})")
+            elif key == ord('G'):  # Increase gamma
+                if hasattr(frame_source, 'get_gamma_correction') and hasattr(frame_source, 'set_gamma_correction'):
+                    current_gamma = frame_source.get_gamma_correction() # type: ignore
+                    new_gamma = min(current_gamma + 0.1, 3.0)
+                    frame_source.set_gamma_correction(new_gamma) # type: ignore
+                    print(f"Gamma correction: {new_gamma:.2f} ({'more contrast' if new_gamma < 1.0 else 'less contrast'})")
+            elif key == ord('n'):  # Decrease noise floor (less noise suppression)
+                if hasattr(frame_source, 'get_noise_floor') and hasattr(frame_source, 'set_noise_floor'):
+                    current_floor = frame_source.get_noise_floor() # type: ignore
+                    new_floor = max(current_floor - 5, -100)
+                    frame_source.set_noise_floor(new_floor) # type: ignore
+                    print(f"Noise floor: {new_floor} dB")
+            elif key == ord('N'):  # Increase noise floor (more noise suppression)
+                if hasattr(frame_source, 'get_noise_floor') and hasattr(frame_source, 'set_noise_floor'):
+                    current_floor = frame_source.get_noise_floor() # type: ignore
+                    new_floor = min(current_floor + 5, -10)
+                    frame_source.set_noise_floor(new_floor) # type: ignore
+                    print(f"Noise floor: {new_floor} dB")
+            elif key == ord('p'):  # Decrease percentile range (more aggressive)
+                if hasattr(frame_source, 'get_percentile_range') and hasattr(frame_source, 'set_percentile_range'):
+                    low, high = frame_source.get_percentile_range() # type: ignore
+                    new_low = min(low + 2, 20)
+                    new_high = max(high - 2, 80)
+                    if new_low < new_high:
+                        frame_source.set_percentile_range(new_low, new_high) # type: ignore
+                        print(f"Percentile range: {new_low}-{new_high}% (more aggressive)")
+            elif key == ord('P'):  # Increase percentile range (less aggressive)
+                if hasattr(frame_source, 'get_percentile_range') and hasattr(frame_source, 'set_percentile_range'):
+                    low, high = frame_source.get_percentile_range() # type: ignore
+                    new_low = max(low - 2, 0)
+                    new_high = min(high + 2, 100)
+                    frame_source.set_percentile_range(new_low, new_high) # type: ignore
+                    print(f"Percentile range: {new_low}-{new_high}% (less aggressive)")
 
     if threaded:
-        camera.stop()
+        frame_source.stop()
         print("Stopped background spectrogram capture thread")
     
-    camera.disconnect()
+    frame_source.disconnect()
     cv2.destroyWindow("Audio Spectrogram")
 
 
@@ -379,7 +442,8 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
 if __name__ == "__main__":
     
     test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
-                           sample_rate=44100, db_range=(-60, 0))
+                           sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive', 
+                           gamma_correction=0.7, noise_floor=-65, percentile_range=(10, 90))
     
     # test_camera('basler')
     # test_camera('ximea')
