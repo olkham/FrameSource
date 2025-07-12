@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "framesource"
 # version is set dynamically from frame_source/_version.py
 dynamic = ["version"]
-description = "A flexible, extensible Python framework for acquiring frames from cameras, video files, image folders, and screen capture."
+description = "A flexible, extensible Python framework for acquiring frames from cameras, video files, image folders, screen capture, and audio spectrograms with built-in frame processors."
 authors = [
     { name = "Oliver Hamilton" }
 ]
@@ -15,7 +15,20 @@ requires-python = ">=3.7"
 dependencies = [
     "opencv-python",
     "numpy",
-    "mss"
+    "mss",
+    "numba"
+]
+
+[project.optional-dependencies]
+audio = [
+    "librosa",
+    "soundfile", 
+    "pyaudio"
+]
+full = [
+    "librosa",
+    "soundfile",
+    "pyaudio"
 ]
 license = { file = "LICENSE" }
 
@@ -35,7 +48,7 @@ addopts = "-ra -q"
 testpaths = ["tests"]
 
 [tool.setuptools]
-packages = ["frame_source"]
+packages = ["frame_source", "frame_processors"]
 
 [tool.setuptools.dynamic]
 version = {attr = "frame_source._version.__version__"}

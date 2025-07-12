@@ -1,3 +1,4 @@
 include README.md
 include LICENSE
 recursive-include frame_source *
+recursive-include frame_processors *
