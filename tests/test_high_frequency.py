@@ -29,17 +29,17 @@ def test_high_frequency_audio():
     # Print configuration info
     print(f"Configuration:")
     if hasattr(camera, 'get_sample_rate'):
-        print(f"  Sample rate: {camera.get_sample_rate()}Hz")
+        print(f"  Sample rate: {camera.get_sample_rate()}Hz") # type: ignore
     if hasattr(camera, 'get_nyquist_frequency'):
-        print(f"  Nyquist frequency: {camera.get_nyquist_frequency()}Hz")
+        print(f"  Nyquist frequency: {camera.get_nyquist_frequency()}Hz") # type: ignore
     if hasattr(camera, 'get_freq_range'):
-        print(f"  Frequency range: {camera.get_freq_range()}")
+        print(f"  Frequency range: {camera.get_freq_range()}") # type: ignore
     if hasattr(camera, 'get_n_mels'):
-        print(f"  Mel bands: {camera.get_n_mels()}")
+        print(f"  Mel bands: {camera.get_n_mels()}") # type: ignore
     
     # Validate frequency range
     if hasattr(camera, 'validate_frequency_range'):
-        is_valid, message = camera.validate_frequency_range(20, 20000)
+        is_valid, message = camera.validate_frequency_range(20, 20000) # type: ignore
         print(f"  Frequency range validation: {message}")
         if not is_valid:
             print("  WARNING: Frequency range validation failed!")
@@ -97,11 +97,11 @@ def test_high_frequency_audio():
             elif key == ord('i'):  # Info
                 print("\nCurrent configuration:")
                 if hasattr(camera, 'get_sample_rate'):
-                    print(f"  Sample rate: {camera.get_sample_rate()}Hz")
+                    print(f"  Sample rate: {camera.get_sample_rate()}Hz") # type: ignore
                 if hasattr(camera, 'get_nyquist_frequency'):
-                    print(f"  Nyquist frequency: {camera.get_nyquist_frequency()}Hz")
+                    print(f"  Nyquist frequency: {camera.get_nyquist_frequency()}Hz") # type: ignore
                 if hasattr(camera, 'get_freq_range'):
-                    print(f"  Frequency range: {camera.get_freq_range()}")
+                    print(f"  Frequency range: {camera.get_freq_range()}") # type: ignore
                     
     finally:
         camera.stop()
