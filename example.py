@@ -4,6 +4,121 @@ from frame_source import FrameSourceFactory
 
 from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
 
+def test_audio_spectrogram(source=None, **kwargs):
+    """Test audio spectrogram capture from microphone or audio file."""
+    cv2.namedWindow("Audio Spectrogram", cv2.WINDOW_NORMAL)
+    print("Testing Audio Spectrogram Capture:")
+    
+    # Default audio parameters for good visualization
+    audio_params = {
+        'n_mels': 128,
+        'n_fft': 2048,
+        'window_duration': 3.0,
+        'freq_range': (20, 8000),
+        'frame_rate': 30,
+        'colormap': cv2.COLORMAP_VIRIDIS,
+        **kwargs
+    }
+    
+    camera = FrameSourceFactory.create('audio_spectrogram', source=source, **audio_params)
+    
+    if not camera.connect():
+        print("Failed to connect to audio source")
+        return
+    
+    threaded = kwargs.get('threaded', True)  # Default to threaded mode
+    print(f"Running in {'threaded' if threaded else 'blocking'} mode")
+    
+    if threaded:
+        camera.start()
+        print("Started background spectrogram capture thread")
+
+    if camera.is_connected:
+        print(f"Audio spectrogram params:")
+        print(f"  Frame size: {camera.get_frame_size()}")
+        print(f"  FPS: {camera.get_fps()}")
+        # Audio-specific parameters (type check since not all cameras have these)
+        if hasattr(camera, 'get_n_mels'):
+            print(f"  N mels: {camera.get_n_mels()}")
+        if hasattr(camera, 'get_window_duration'):
+            print(f"  Window duration: {camera.get_window_duration()}s")
+        if hasattr(camera, 'get_freq_range'):
+            print(f"  Frequency range: {camera.get_freq_range()}")
+        if hasattr(camera, 'get_sample_rate'):
+            print(f"  Sample rate: {camera.get_sample_rate()}Hz")
+        if hasattr(camera, 'get_nyquist_frequency'):
+            print(f"  Nyquist frequency (max): {camera.get_nyquist_frequency()}Hz")
+        if hasattr(camera, 'get_fft_size'):
+            print(f"  FFT size: {camera.get_fft_size()}")
+        
+        print("\nKey controls:")
+        print("  ESC - Quit")
+        print("  h - Show this help")
+        print("  0 - Grayscale (default)")
+        print("  1 - Viridis colormap")
+        print("  2 - Plasma colormap")
+        print("  3 - Inferno colormap") 
+        print("  4 - Hot colormap")
+        print("  5 - Jet colormap")
+        print("  +/- - Adjust mel bands")
+        
+        while camera.is_connected:
+            ret, frame = camera.read()
+            if ret and frame is not None:
+                cv2.imshow("Audio Spectrogram", frame)
+                
+            key = cv2.waitKey(1) & 0xFF
+            if key == 27:  # ESC key to quit
+                break
+            elif key == ord('h'):  # Show help
+                print("\nKey controls:")
+                print("  ESC - Quit")
+                print("  h - Show this help")
+                print("  0 - Grayscale (default)")
+                print("  1 - Viridis colormap")
+                print("  2 - Plasma colormap")
+                print("  3 - Inferno colormap") 
+                print("  4 - Hot colormap")
+                print("  5 - Jet colormap")
+                print("  + - Increase mel bands (requires restart)")
+                print("  - - Decrease mel bands (requires restart)")
+            elif key == ord('0') and hasattr(camera, 'set_colormap'):
+                camera.set_colormap(None)
+                print("Colormap: Grayscale")
+            elif key == ord('1') and hasattr(camera, 'set_colormap'):
+                camera.set_colormap(cv2.COLORMAP_VIRIDIS)
+                print("Colormap: Viridis")
+            elif key == ord('2') and hasattr(camera, 'set_colormap'):
+                camera.set_colormap(cv2.COLORMAP_PLASMA)
+                print("Colormap: Plasma")
+            elif key == ord('3') and hasattr(camera, 'set_colormap'):
+                camera.set_colormap(cv2.COLORMAP_INFERNO)
+                print("Colormap: Inferno")
+            elif key == ord('4') and hasattr(camera, 'set_colormap'):
+                camera.set_colormap(cv2.COLORMAP_HOT)
+                print("Colormap: Hot")
+            elif key == ord('5') and hasattr(camera, 'set_colormap'):
+                camera.set_colormap(cv2.COLORMAP_JET)
+                print("Colormap: Jet")
+            elif key == ord('+') or key == ord('='):
+                if hasattr(camera, 'get_n_mels') and hasattr(camera, 'set_n_mels'):
+                    current_mels = camera.get_n_mels()
+                    camera.set_n_mels(min(current_mels + 16, 256))
+                    print(f"Mel bands: {camera.get_n_mels()} (restart to apply)")
+            elif key == ord('-'):
+                if hasattr(camera, 'get_n_mels') and hasattr(camera, 'set_n_mels'):
+                    current_mels = camera.get_n_mels()
+                    camera.set_n_mels(max(current_mels - 16, 32))
+                    print(f"Mel bands: {camera.get_n_mels()} (restart to apply)")
+
+    if threaded:
+        camera.stop()
+        print("Stopped background spectrogram capture thread")
+    
+    camera.disconnect()
+    cv2.destroyWindow("Audio Spectrogram")
+
+
 def test_360_camera(name, **kwargs):
     """Test a 360 camera with equirectangular to pinhole projection."""
     cv2.namedWindow("camera", cv2.WINDOW_NORMAL)
@@ -262,15 +377,20 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
 
 # Example usage and testing
 if __name__ == "__main__":
+    
+    test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
+                           sample_rate=44100, db_range=(-60, 0))
+    
     # test_camera('basler')
     # test_camera('ximea')
-    test_camera('webcam', source=0, threaded=True, width=2880, height=1440, fps=30)
+    # test_camera('webcam', source=0, threaded=True, width=1920, height=1080, fps=30)   # standard 1080p webcam
+    # test_camera('webcam', source=0, threaded=True, width=2880, height=1440, fps=30)   # insta360 x5 webcam mode settings
     # test_camera('video_file', source="media/geti_demo.mp4", loop=True)
     # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="password")
     # test_camera('folder', source="media/image_seq", sort_by='date', fps=30, real_time=True, loop=True)
     # test_camera('screen', x=100, y=100, w=800, h=600, fps=30, threaded=True)
 
-    test_360_camera('webcam', source=0, threaded=True, processor={'type': 'equirectangular', 'output_width': 1920, 'output_height': 1080, 'fov': 90})
+    # test_360_camera('webcam', source=0, threaded=True, processor={'type': 'equirectangular', 'output_width': 1920, 'output_height': 1080, 'fov': 90})
 
     # cameras = [
         # {'capture_type': 'basler', 'threaded': True},

@@ -24,6 +24,7 @@ from .ipcamera_capture import IPCameraCapture
 from .video_file_capture import VideoFileCapture
 from .folder_capture import FolderCapture
 from .screen_capture import ScreenCapture
+from .audiospectrogram_capture import AudioSpectrogramCapture
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +42,7 @@ class FrameSourceFactory:
         'ximea': XimeaCapture,
         'basler': BaslerCapture,
         'screen': ScreenCapture,
+        'audio_spectrogram': AudioSpectrogramCapture,
     }
     
     @classmethod

@@ -1,0 +1,521 @@
+import numpy as np
+import cv2
+import threading
+import time
+import logging
+from typing import Optional, Tuple, Any, Union
+from pathlib import Path
+
+try:
+    import librosa
+    import soundfile as sf
+    import pyaudio
+    AUDIO_AVAILABLE = True
+except ImportError as e:
+    AUDIO_AVAILABLE = False
+    MISSING_DEPS = str(e)
+
+from .video_capture_base import VideoCaptureBase
+
+logger = logging.getLogger(__name__)
+
+
+class AudioSpectrogramCapture(VideoCaptureBase):
+    """
+    Capture audio spectrograms as video frames from microphones or audio files.
+    Treats spectrograms as visual data that can be processed like regular video frames.
+    """
+    
+    def __init__(self, source: Union[int, str, None] = None, **kwargs):
+        """
+        Initialize audio spectrogram capture.
+        
+        Args:
+            source: Audio source - microphone index (int), file path (str), or None for default mic
+            **kwargs: Spectrogram parameters:
+                - n_mels: Number of mel bands (default: 128)
+                - n_fft: FFT window size (default: 2048)
+                - hop_length: Number of samples between successive frames (default: 512)
+                - window_duration: Duration of audio window in seconds (default: 2.0)
+                - freq_range: Frequency range tuple (min_freq, max_freq) (default: (20, 8000))
+                - sample_rate: Audio sample rate (default: 44100)
+                - colormap: OpenCV colormap for visualization (default: None for grayscale)
+                - db_range: Dynamic range in dB (default: (-80, 0))
+                - frame_rate: Spectrogram update rate in Hz (default: 30)
+                - audio_buffer_size: Audio buffer size in samples (default: 1024)
+        """
+        if not AUDIO_AVAILABLE:
+            raise ImportError(f"Audio dependencies not available: {MISSING_DEPS}. "
+                            "Install with: pip install librosa soundfile pyaudio")
+        
+        super().__init__(source, **kwargs)
+        
+        # Spectrogram parameters
+        self.n_mels = kwargs.get('n_mels', 128)
+        self.n_fft = kwargs.get('n_fft', 2048)
+        self.hop_length = kwargs.get('hop_length', 512)
+        self.window_duration = kwargs.get('window_duration', 2.0)
+        self.freq_range = kwargs.get('freq_range', (20, 8000))
+        self.sample_rate = kwargs.get('sample_rate', 44100)  # Increased to support higher frequencies
+        self.colormap = kwargs.get('colormap', None)  # None means grayscale (no colormap applied)
+        self.db_range = kwargs.get('db_range', (-80, 0))
+        self.frame_rate = kwargs.get('frame_rate', 30)
+        self.audio_buffer_size = kwargs.get('audio_buffer_size', 1024)
+        
+        # Validate and adjust sample rate based on frequency range
+        max_freq = self.freq_range[1]
+        nyquist_freq = self.sample_rate / 2
+        if max_freq > nyquist_freq:
+            # Automatically adjust sample rate to support the requested frequency range
+            required_sample_rate = int(max_freq * 2.2)  # Add 10% margin above Nyquist
+            # Round to common sample rates
+            common_rates = [22050, 44100, 48000, 88200, 96000, 192000]
+            self.sample_rate = min(rate for rate in common_rates if rate >= required_sample_rate)
+            logger.warning(f"Frequency range {self.freq_range} requires sample rate >= {required_sample_rate}Hz. "
+                          f"Adjusted sample rate to {self.sample_rate}Hz")
+        
+        logger.info(f"Sample rate: {self.sample_rate}Hz, Nyquist frequency: {self.sample_rate/2}Hz")
+        
+        # Calculated parameters
+        self.window_samples = int(self.window_duration * self.sample_rate)
+        self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
+        
+        # Audio processing
+        self.audio_buffer = np.zeros(self.window_samples, dtype=np.float32)
+        self.mel_filter: Optional[np.ndarray] = None
+        self.pyaudio_instance = None
+        self.audio_stream = None
+        self.audio_thread = None
+        self.audio_stop_event = None
+        self.is_file_source = False
+        self.audio_data: Optional[np.ndarray] = None
+        self.audio_position = 0
+        
+        # Frame buffer for consistent frame rate
+        self.current_frame = None
+        self.frame_lock = threading.Lock()
+        
+        # Background thread variables
+        self._capture_thread = None
+        self._stop_event = None
+        self._latest_frame = None
+        
+        logger.info(f"AudioSpectrogramCapture initialized - Source: {source}")
+        logger.info(f"Spectrogram params: n_mels={self.n_mels}, n_fft={self.n_fft}, "
+                   f"window_duration={self.window_duration}s, freq_range={self.freq_range}")
+    
+    def start(self):
+        """
+        Start background thread to continuously generate spectrogram frames.
+        """
+        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
+            return  # Already running
+        self._stop_event = threading.Event()
+        self._latest_frame = None
+        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
+        self._capture_thread.start()
+        logger.info("Started background spectrogram capture thread")
+
+    def stop(self):
+        """
+        Stop background spectrogram capture thread.
+        """
+        if hasattr(self, '_stop_event') and self._stop_event is not None:
+            self._stop_event.set()
+        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
+            self._capture_thread.join(timeout=2)
+        self._capture_thread = None
+        self._stop_event = None
+        logger.info("Stopped background spectrogram capture thread")
+
+    def _background_capture(self):
+        """Background thread function for continuous spectrogram generation."""
+        frame_interval = 1.0 / self.frame_rate
+        while not self._stop_event.is_set():  # type: ignore
+            start_time = time.time()
+            success, frame = self._read_direct()
+            if success:
+                with self.frame_lock:
+                    self._latest_frame = frame
+            
+            # Maintain consistent frame rate
+            elapsed = time.time() - start_time
+            sleep_time = max(0, frame_interval - elapsed)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
+        """
+        Get the most recent spectrogram frame captured by the background thread.
+        Returns:
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
+        """
+        with self.frame_lock:
+            frame = getattr(self, '_latest_frame', None)
+        return (frame is not None), frame
+
+    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
+        """
+        Directly read a spectrogram frame (bypassing background thread logic).
+        Returns:
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
+        """
+        if not self.is_connected:
+            return False, None
+        
+        try:
+            if self.is_file_source:
+                return self._read_file_frame()
+            else:
+                return self._read_microphone_frame()
+                
+        except Exception as e:
+            logger.error(f"Error reading frame: {e}")
+            return False, None
+    
+    def connect(self) -> bool:
+        """Connect to audio source."""
+        try:
+            self._setup_mel_filter()
+            
+            if isinstance(self.source, str) and Path(self.source).exists():
+                return self._connect_file()
+            else:
+                return self._connect_microphone()
+                
+        except Exception as e:
+            logger.error(f"Failed to connect to audio source: {e}")
+            return False
+    
+    def _setup_mel_filter(self):
+        """Setup mel filter bank."""
+        self.mel_filter = librosa.filters.mel(
+            sr=self.sample_rate,
+            n_fft=self.n_fft,
+            n_mels=self.n_mels,
+            fmin=self.freq_range[0],
+            fmax=self.freq_range[1]
+        )
+        if self.mel_filter is not None:
+            logger.info(f"Mel filter bank created: {self.mel_filter.shape}")
+        else:
+            logger.error("Failed to create mel filter bank")
+    
+    def _connect_file(self) -> bool:
+        """Connect to audio file."""
+        try:
+            self.audio_data, sr = librosa.load(self.source, sr=self.sample_rate)
+            if sr != self.sample_rate:
+                logger.warning(f"File sample rate {sr} resampled to {self.sample_rate}")
+            
+            self.is_file_source = True
+            self.audio_position = 0
+            self.is_connected = True
+            
+            logger.info(f"Connected to audio file: {self.source} "
+                       f"(duration: {len(self.audio_data)/self.sample_rate:.2f}s)" if self.audio_data is not None else "")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to load audio file: {e}")
+            return False
+    
+    def _connect_microphone(self) -> bool:
+        """Connect to microphone."""
+        try:
+            self.pyaudio_instance = pyaudio.PyAudio()
+            
+            # Determine device index
+            device_index = None
+            if isinstance(self.source, int):
+                device_index = self.source
+            
+            # Get device info
+            if device_index is not None:
+                device_info = self.pyaudio_instance.get_device_info_by_index(device_index)
+                logger.info(f"Using audio device: {device_info['name']}")
+            
+            # Open audio stream
+            self.audio_stream = self.pyaudio_instance.open(
+                format=pyaudio.paFloat32,
+                channels=1,
+                rate=self.sample_rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=self.audio_buffer_size,
+                stream_callback=self._audio_callback
+            )
+            
+            self.is_file_source = False
+            self.is_connected = True
+            
+            logger.info(f"Connected to microphone (device {device_index})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to microphone: {e}")
+            return False
+    
+    def _audio_callback(self, in_data, frame_count, time_info, status):
+        """PyAudio callback for real-time audio capture."""
+        if status:
+            logger.warning(f"Audio callback status: {status}")
+        
+        audio_chunk = np.frombuffer(in_data, dtype=np.float32)
+        
+        # Shift buffer and add new data
+        shift_amount = len(audio_chunk)
+        self.audio_buffer[:-shift_amount] = self.audio_buffer[shift_amount:]
+        self.audio_buffer[-shift_amount:] = audio_chunk
+        
+        return (None, pyaudio.paContinue)
+    
+    def disconnect(self) -> bool:
+        """Disconnect from audio source."""
+        try:
+            # Stop background thread first
+            self.stop()
+            
+            self.is_connected = False
+            
+            if self.audio_stream:
+                self.audio_stream.stop_stream()
+                self.audio_stream.close()
+                self.audio_stream = None
+            
+            if self.pyaudio_instance:
+                self.pyaudio_instance.terminate()
+                self.pyaudio_instance = None
+            
+            logger.info("Disconnected from audio source")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error disconnecting: {e}")
+            return False
+    
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+        """
+        Return the latest frame captured by the background thread, or fall back to direct read if not running.
+        """
+        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
+            return self.get_latest_frame()
+        else:
+            return self._read_direct()
+    
+    def _read_file_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
+        """Read frame from audio file."""
+        if self.audio_data is None:
+            return False, None
+            
+        if self.audio_position + self.window_samples > len(self.audio_data):
+            # Loop back to beginning
+            self.audio_position = 0
+        
+        # Extract audio window
+        audio_window = self.audio_data[self.audio_position:self.audio_position + self.window_samples]
+        
+        # Advance position
+        advance_samples = int(self.sample_rate / self.frame_rate)
+        self.audio_position += advance_samples
+        
+        # Generate spectrogram
+        spectrogram = self._generate_spectrogram(audio_window)
+        return True, spectrogram
+    
+    def _read_microphone_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
+        """Read frame from microphone."""
+        if not self.audio_stream or not self.audio_stream.is_active():
+            return False, None
+        
+        # Use current audio buffer
+        audio_window = self.audio_buffer.copy()
+        
+        # Generate spectrogram
+        spectrogram = self._generate_spectrogram(audio_window)
+        return True, spectrogram
+    
+    def _generate_spectrogram(self, audio_data: np.ndarray) -> np.ndarray:
+        """Generate mel spectrogram from audio data."""
+        if self.mel_filter is None:
+            raise RuntimeError("Mel filter not initialized")
+            
+        # Compute STFT
+        stft = librosa.stft(audio_data, n_fft=self.n_fft, hop_length=self.hop_length)
+        magnitude = np.abs(stft)
+        
+        # Apply mel filter
+        mel_spectrogram = np.dot(self.mel_filter, magnitude)
+        
+        # Convert to dB
+        mel_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
+        
+        # Normalize to 0-255 range
+        mel_normalized = np.clip((mel_db - self.db_range[0]) / (self.db_range[1] - self.db_range[0]), 0, 1)
+        mel_uint8 = (mel_normalized * 255).astype(np.uint8)
+        
+        # Flip vertically (high frequencies at top)
+        mel_uint8 = np.flipud(mel_uint8)
+        
+        # Apply colormap if specified, otherwise return grayscale
+        if self.colormap is not None:
+            colored = cv2.applyColorMap(mel_uint8, self.colormap)
+        else:
+            # Convert grayscale to 3-channel for consistency with colored spectrograms
+            colored = cv2.cvtColor(mel_uint8, cv2.COLOR_GRAY2BGR)
+        
+        return colored
+    
+    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+        """Get spectrogram frame dimensions (width, height)."""
+        return (self.spectrogram_width, self.n_mels)
+    
+    def set_frame_size(self, width: int, height: int) -> bool:
+        """Set spectrogram dimensions by adjusting parameters."""
+        logger.warning("Frame size for spectrograms is determined by audio parameters. "
+                      "Adjust n_mels, window_duration, or hop_length instead.")
+        return False
+    
+    def get_fps(self) -> Optional[float]:
+        """Get spectrogram frame rate."""
+        return self.frame_rate
+    
+    def set_fps(self, fps: float) -> bool:
+        """Set spectrogram frame rate."""
+        if fps > 0:
+            self.frame_rate = fps
+            return True
+        return False
+    
+    # Audio-specific parameter methods
+    def get_n_mels(self) -> int:
+        """Get number of mel bands."""
+        return self.n_mels
+    
+    def set_n_mels(self, n_mels: int) -> bool:
+        """Set number of mel bands (requires reconnection)."""
+        if n_mels > 0:
+            self.n_mels = n_mels
+            logger.info(f"n_mels set to {n_mels}. Reconnect to apply changes.")
+            return True
+        return False
+    
+    def get_window_duration(self) -> float:
+        """Get audio window duration."""
+        return self.window_duration
+    
+    def set_window_duration(self, duration: float) -> bool:
+        """Set audio window duration (requires reconnection)."""
+        if duration > 0:
+            self.window_duration = duration
+            self.window_samples = int(duration * self.sample_rate)
+            self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
+            logger.info(f"Window duration set to {duration}s. Reconnect to apply changes.")
+            return True
+        return False
+    
+    def get_freq_range(self) -> Tuple[float, float]:
+        """Get frequency range."""
+        return self.freq_range
+    
+    def set_freq_range(self, min_freq: float, max_freq: float) -> bool:
+        """Set frequency range (requires reconnection). Automatically adjusts sample rate if needed."""
+        if 0 < min_freq < max_freq:
+            # Check if current sample rate supports the requested frequency range
+            nyquist_freq = self.sample_rate / 2
+            if max_freq > nyquist_freq:
+                # Automatically adjust sample rate to support the requested frequency range
+                required_sample_rate = int(max_freq * 2.2)  # Add 10% margin above Nyquist
+                # Round to common sample rates
+                common_rates = [22050, 44100, 48000, 88200, 96000, 192000]
+                new_sample_rate = min(rate for rate in common_rates if rate >= required_sample_rate)
+                
+                logger.warning(f"Frequency range ({min_freq}, {max_freq}) requires sample rate >= {required_sample_rate}Hz. "
+                              f"Adjusted sample rate from {self.sample_rate}Hz to {new_sample_rate}Hz")
+                self.sample_rate = new_sample_rate
+                
+                # Recalculate window samples based on new sample rate
+                self.window_samples = int(self.window_duration * self.sample_rate)
+                self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
+            
+            self.freq_range = (min_freq, max_freq)
+            logger.info(f"Frequency range set to {self.freq_range}. Sample rate: {self.sample_rate}Hz. Reconnect to apply changes.")
+            return True
+        return False
+    
+    def get_nyquist_frequency(self) -> float:
+        """Get the Nyquist frequency (maximum representable frequency)."""
+        return self.sample_rate / 2.0
+    
+    def get_sample_rate(self) -> int:
+        """Get the current sample rate."""
+        return self.sample_rate
+    
+    def set_sample_rate(self, sample_rate: int) -> bool:
+        """Set sample rate (requires reconnection)."""
+        if sample_rate > 0:
+            self.sample_rate = sample_rate
+            # Recalculate dependent parameters
+            self.window_samples = int(self.window_duration * self.sample_rate)
+            self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
+            logger.info(f"Sample rate set to {sample_rate}Hz. Nyquist frequency: {self.get_nyquist_frequency()}Hz. Reconnect to apply changes.")
+            return True
+        return False
+
+    def set_colormap(self, colormap: Optional[int]) -> bool:
+        """
+        Set the colormap for spectrogram visualization.
+        
+        Args:
+            colormap: OpenCV colormap constant (e.g., cv2.COLORMAP_VIRIDIS) or None for grayscale
+            
+        Returns:
+            bool: True if successful
+        """
+        self.colormap = colormap
+        colormap_name = "grayscale" if colormap is None else f"cv2 colormap {colormap}"
+        logger.info(f"Colormap set to {colormap_name}")
+        return True
+    
+    def get_colormap(self) -> Optional[int]:
+        """Get the current colormap (None means grayscale)."""
+        return self.colormap
+
+    def validate_frequency_range(self, min_freq: float, max_freq: float) -> Tuple[bool, str]:
+        """
+        Validate if the frequency range is supported by the current configuration.
+        
+        Returns:
+            Tuple[bool, str]: (is_valid, message)
+        """
+        nyquist = self.sample_rate / 2.0
+        
+        if min_freq <= 0:
+            return False, f"Minimum frequency must be > 0, got {min_freq}"
+        if max_freq <= min_freq:
+            return False, f"Maximum frequency must be > minimum frequency, got {max_freq} <= {min_freq}"
+        if max_freq > nyquist:
+            return False, f"Maximum frequency {max_freq}Hz exceeds Nyquist limit {nyquist}Hz for sample rate {self.sample_rate}Hz"
+        
+        return True, "Frequency range is valid"
+
+    # Stub methods for base class compatibility
+    def enable_auto_exposure(self, enable: bool = True) -> bool:
+        """Not applicable for audio capture."""
+        return True
+    
+    def set_exposure(self, value: float) -> bool:
+        """Not applicable for audio capture."""
+        return True
+    
+    def get_exposure(self) -> Optional[float]:
+        """Not applicable for audio capture."""
+        return None
+    
+    def set_gain(self, value: float) -> bool:
+        """Audio gain control could be implemented here."""
+        return True
+    
+    def get_gain(self) -> Optional[float]:
+        """Audio gain control could be implemented here."""
+        return None
