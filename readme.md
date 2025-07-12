@@ -12,6 +12,7 @@ FrameSource is a flexible, extensible Python framework for acquiring frames from
 - 🗂️ **Folder of Images** (sorted by name or creation time)
 - 🏭 **Industrial Cameras** (e.g., Ximea, Basler, Huateng)
 - 🖼️ **Screen Capture** (live region of your desktop)
+- 🎵 **Audio Spectrogram** (microphone or audio file as visual frames)
 
 ## Demo
 
@@ -23,8 +24,9 @@ When I work on computer vision, robotics, or video analytics projects, I often n
 
 ## Features ✨
 
-- Unified interface for all frame sources (cameras, video files, image folders, screen capture)
-- Easily extensible with new capture types
+- Unified interface for all frame sources (cameras, video files, image folders, screen capture, audio spectrograms)
+- Built-in frame processors for specialized transformations (360° equirectangular to pinhole projection)
+- Easily extensible with new capture types and processing modules
 - Threaded/background capture support for smooth frame acquisition
 - Control over exposure, gain, resolution, FPS (where supported by the source)
 - Real-time playback and looping for video and image folders
@@ -44,6 +46,14 @@ Or for development (editable) install:
 
 ```sh
 pip install -e .
+```
+
+### Audio Spectrogram Dependencies
+
+For audio spectrogram capture, install additional dependencies:
+
+```sh
+pip install librosa soundfile pyaudio
 ```
 
 ## Example Usage
@@ -109,13 +119,153 @@ while cap.is_connected:
 cap.disconnect()
 ```
 
+#### Audio Spectrogram Capture
+```python
+# Audio spectrogram from microphone (real-time)
+cap = FrameSourceFactory.create('audio_spectrogram', 
+                              source=None,  # None = default microphone
+                              n_mels=128, 
+                              window_duration=2.0,
+                              freq_range=(20, 8000),
+                              colormap=cv2.COLORMAP_VIRIDIS)
+cap.connect()
+cap.start()  # Start background audio processing
+while cap.is_connected:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    # frame is now a visual spectrogram that can be processed like any other image
+cap.disconnect()
+
+# Audio spectrogram from file
+cap = FrameSourceFactory.create('audio_spectrogram', 
+                              source='path/to/audio.wav',
+                              n_mels=64,
+                              frame_rate=30)
+cap.connect()
+while cap.is_connected:
+    ret, frame = cap.read()
+    if not ret:
+        break
+cap.disconnect()
+```
+
+## Frame Processors 🔄
+
+FrameSource includes powerful frame processors for specialized transformations:
+
+### Equirectangular 360° to Pinhole Projection
+
+Convert 360° equirectangular footage to normal pinhole camera views:
+
+```python
+from frame_source import FrameSourceFactory
+from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+
+# Load 360° video
+cap = FrameSourceFactory.create('video_file', source='360_video.mp4')
+cap.connect()
+
+# Create processor for 90° FOV pinhole view
+processor = Equirectangular2PinholeProcessor(fov=90.0, output_width=1920, output_height=1080)
+
+# Set viewing angles (in degrees)
+processor.set_parameter('yaw', 45.0)    # Look right
+processor.set_parameter('pitch', 0.0)   # Look straight ahead
+processor.set_parameter('roll', 0.0)    # No rotation
+
+# Attach processor to the frame source for automatic processing
+cap.attach_processor(processor)
+
+while cap.is_connected:
+    ret, frame = cap.read()  # Frame is automatically processed by attached processor
+    if not ret:
+        break
+    
+    # The frame is now the processed pinhole projection
+    cv2.imshow('360° to Pinhole', frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.disconnect()
+```
+
+You can also manually process frames without attaching:
+
+```python
+# Manual processing (without attach)
+while cap.is_connected:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    
+    # Manually process the frame
+    pinhole_frame = processor.process(frame)
+    cv2.imshow('360° to Pinhole', pinhole_frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+```
+
+### Creating Custom Frame Processors
+
+Extend the `FrameProcessor` base class for your own transformations:
+
+```python
+from frame_processors.frame_processor import FrameProcessor
+import cv2
+
+class GrayscaleProcessor(FrameProcessor):
+    def process(self, frame):
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+# Use your custom processor
+processor = GrayscaleProcessor()
+
+# Option 1: Attach to frame source for automatic processing
+cap = FrameSourceFactory.create('webcam', source=0)
+cap.connect()
+cap.attach_processor(processor)
+
+while cap.is_connected:
+    ret, frame = cap.read()  # Frame is automatically converted to grayscale
+    if not ret:
+        break
+    cv2.imshow('Grayscale', frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Option 2: Manual processing
+processed_frame = processor.process(original_frame)
+```
+
 ## Extending FrameSource
+
+### Adding New Frame Sources
 
 Want to add a new camera or source? Just subclass `VideoCaptureBase` and register it:
 
 ```python
 from frame_source import FrameSourceFactory
 FrameSourceFactory.register_capture_type('my_camera', MyCameraCapture)
+```
+
+### Adding New Frame Processors
+
+Create custom frame processors by extending `FrameProcessor`:
+
+```python
+from frame_processors.frame_processor import FrameProcessor
+
+class MyCustomProcessor(FrameProcessor):
+    def __init__(self, custom_param=1.0):
+        super().__init__()
+        self.set_parameter('custom_param', custom_param)
+    
+    def process(self, frame):
+        # Your custom processing logic here
+        custom_param = self.get_parameter('custom_param')
+        # ... apply transformation ...
+        return processed_frame
 ```
 
 ## Credits
