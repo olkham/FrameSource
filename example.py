@@ -59,20 +59,23 @@ def test_audio_spectrogram(source=None, **kwargs):
         if hasattr(frame_source, 'get_percentile_range'):
             print(f"  Percentile range: {frame_source.get_percentile_range()}%") # type: ignore
         
-        print("\nKey controls:")
-        print("  ESC - Quit")
-        print("  h - Show this help")
-        print("  0 - Grayscale (default)")
-        print("  1 - Viridis colormap")
-        print("  2 - Plasma colormap")
-        print("  3 - Inferno colormap") 
-        print("  4 - Hot colormap")
-        print("  5 - Jet colormap")
-        print("  +/- - Adjust mel bands")
-        print("  c - Cycle contrast methods (fixed/adaptive/percentile)")
-        print("  g/G - Decrease/increase gamma correction")
-        print("  n/N - Decrease/increase noise floor")
-        print("  p/P - Adjust percentile range")
+        def print_help():
+            print("\nKey controls:")
+            print("  ESC - Quit")
+            print("  h - Show this help")
+            print("  0 - Grayscale (default)")
+            print("  1 - Viridis colormap")
+            print("  2 - Plasma colormap")
+            print("  3 - Inferno colormap") 
+            print("  4 - Hot colormap")
+            print("  5 - Jet colormap")
+            print("  +/- - Adjust mel bands (requires restart)")
+            print("  c - Cycle contrast methods (fixed/adaptive/percentile)")
+            print("  g/G - Decrease/increase gamma correction")
+            print("  n/N - Decrease/increase noise floor")
+            print("  p/P - Adjust percentile range")
+        
+        print_help()
         
         while frame_source.is_connected:
             ret, frame = frame_source.read()
@@ -83,21 +86,7 @@ def test_audio_spectrogram(source=None, **kwargs):
             if key == 27:  # ESC key to quit
                 break
             elif key == ord('h'):  # Show help
-                print("\nKey controls:")
-                print("  ESC - Quit")
-                print("  h - Show this help")
-                print("  0 - Grayscale (default)")
-                print("  1 - Viridis colormap")
-                print("  2 - Plasma colormap")
-                print("  3 - Inferno colormap") 
-                print("  4 - Hot colormap")
-                print("  5 - Jet colormap")
-                print("  + - Increase mel bands (requires restart)")
-                print("  - - Decrease mel bands (requires restart)")
-                print("  c - Cycle contrast methods (fixed/adaptive/percentile)")
-                print("  g/G - Decrease/increase gamma correction")
-                print("  n/N - Decrease/increase noise floor")
-                print("  p/P - Adjust percentile range")
+                print_help()
             elif key == ord('0') and hasattr(frame_source, 'set_colormap'):
                 frame_source.set_colormap(None) # type: ignore
                 print("Colormap: Grayscale")
