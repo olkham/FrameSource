@@ -95,7 +95,7 @@ class ScreenCapture(VideoCaptureBase):
         logger.info("ScreenCapture disconnected.")
         return True
 
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         # If background thread is running, return latest frame
         if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
             return self.get_latest_frame()

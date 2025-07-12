@@ -152,7 +152,7 @@ class XimeaCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from Ximea camera: {e}")
             return False
     
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
         """

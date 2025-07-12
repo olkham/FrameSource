@@ -1,6 +1,110 @@
-from frame_source import FrameSourceFactory
 import cv2
 from typing import Any, List
+from frame_source import FrameSourceFactory
+
+from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+
+def test_360_camera(name, **kwargs):
+    """Test a 360 camera with equirectangular to pinhole projection."""
+    cv2.namedWindow("camera", cv2.WINDOW_NORMAL)
+    print("Testing 360 Camera Capture:")
+    camera = FrameSourceFactory.create(name, **kwargs)
+    camera.connect()
+    
+    # Set camera resolution and fps - insta360 x5 webcam mode settings
+    camera.set_frame_size(2880, 1440)
+    camera.set_fps(30)
+    
+    # Add processor if specified
+    if 'processor' in kwargs:
+        processor_config = kwargs.pop('processor')
+        processor_type = processor_config.pop('type')
+        if processor_type == 'equirectangular':
+            processor = Equirectangular2PinholeProcessor(**processor_config)
+            camera.attach_processor(processor)
+
+    threaded = kwargs.get('threaded', False)
+    if threaded:
+        camera.start()
+
+    if camera.is_connected:
+        print(f"Frame size: {camera.get_frame_size()}")
+        print(f"FPS: {camera.get_fps()}")
+        
+        # Read a few frames
+        while camera.is_connected:
+            ret, frame = camera.read()
+            if ret:
+                if frame is not None:
+                    cv2.imshow("camera", frame)
+                key = cv2.waitKey(1) & 0xFF
+                if key == 27:  # ESC key to quit
+                    break
+                elif key == ord('h'):  # Show help
+                    print("\nKey controls:")
+                    print("  ESC - Quit")
+                    print("  h - Show this help")
+                    # Add processor controls if processor is attached
+                    if hasattr(camera, '_processors') and camera._processors:
+                        print("\nProcessor controls:")
+                        print("  w/s - Adjust pitch (up/down)")
+                        print("  a/d - Adjust yaw (left/right)")  
+                        print("  q/e - Adjust roll (left/right)")
+                        print("  r - Reset processor angles")
+                elif key == ord('w'):  # Pitch up
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'get_parameter'):
+                            current_pitch = processor.get_parameter('pitch') or 0
+                            processor.set_parameter('pitch', current_pitch + 5.0)
+                            print(f"Pitch: {processor.get_parameter('pitch'):.1f}°")
+                elif key == ord('s'):  # Pitch down
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'get_parameter'):
+                            current_pitch = processor.get_parameter('pitch') or 0
+                            processor.set_parameter('pitch', current_pitch - 5.0)
+                            print(f"Pitch: {processor.get_parameter('pitch'):.1f}°")
+                elif key == ord('a'):  # Yaw left
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'get_parameter'):
+                            current_yaw = processor.get_parameter('yaw') or 0
+                            processor.set_parameter('yaw', current_yaw - 5.0)
+                            print(f"Yaw: {processor.get_parameter('yaw'):.1f}°")
+                elif key == ord('d'):  # Yaw right
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'get_parameter'):
+                            current_yaw = processor.get_parameter('yaw') or 0
+                            processor.set_parameter('yaw', current_yaw + 5.0)
+                            print(f"Yaw: {processor.get_parameter('yaw'):.1f}°")
+                elif key == ord('q'):  # Roll left
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'get_parameter'):
+                            current_roll = processor.get_parameter('roll') or 0
+                            processor.set_parameter('roll', current_roll - 5.0)
+                            print(f"Roll: {processor.get_parameter('roll'):.1f}°")
+                elif key == ord('e'):  # Roll right
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'get_parameter'):
+                            current_roll = processor.get_parameter('roll') or 0
+                            processor.set_parameter('roll', current_roll + 5.0)
+                            print(f"Roll: {processor.get_parameter('roll'):.1f}°")
+                elif key == ord('r'):  # Reset processor angles
+                    processors = getattr(camera, '_processors', [])
+                    for processor in processors:
+                        if hasattr(processor, 'set_parameter'):
+                            processor.set_parameter('pitch', 0.0)
+                            processor.set_parameter('yaw', 0.0)
+                            processor.set_parameter('roll', 0.0)
+                            print("Processor angles reset to 0°")
+            else:
+                print(f"Failed to read frame")
+
+    camera.disconnect() 
 
 
 def test_camera(name, **kwargs):
@@ -8,13 +112,18 @@ def test_camera(name, **kwargs):
     cv2.namedWindow("camera", cv2.WINDOW_NORMAL)
     print("Testing Webcam Capture:")
     camera = FrameSourceFactory.create(name, **kwargs)
-    
     camera.connect()
 
     threaded = kwargs.get('threaded', False)
     if threaded:
         camera.start()
 
+    width = kwargs.get('width', 1920)
+    height = kwargs.get('height', 1080)
+    fps = kwargs.get('fps', 30)
+    camera.set_frame_size(width, height)    
+    camera.set_fps(fps)
+    
     if camera.is_connected:
 
         exposure_range = camera.get_exposure_range()
@@ -51,6 +160,7 @@ def test_camera(name, **kwargs):
                     cv2.imshow("camera", frame)
                 # Add key controls for exposure and gain adjustment
                 key = cv2.waitKey(1) & 0xFF
+                
                 if key == ord('q'):
                     break
                 elif key == ord('=') or key == ord('+'):  # Increase exposure
@@ -154,20 +264,22 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
 if __name__ == "__main__":
     # test_camera('basler')
     # test_camera('ximea')
-    # test_camera('webcam', source=0)
+    test_camera('webcam', source=0, threaded=True, width=2880, height=1440, fps=30)
     # test_camera('video_file', source="media/geti_demo.mp4", loop=True)
     # test_camera('ipcam', source="rtsp://192.168.1.153:554/h264Preview_01_sub", username="admin", password="password")
     # test_camera('folder', source="media/image_seq", sort_by='date', fps=30, real_time=True, loop=True)
     # test_camera('screen', x=100, y=100, w=800, h=600, fps=30, threaded=True)
 
-    cameras = [
-        {'capture_type': 'basler', 'threaded': True},
-        {'capture_type': 'ximea', 'threaded': True},
-        {'capture_type': 'webcam', 'threaded': True},
+    test_360_camera('webcam', source=0, threaded=True, processor={'type': 'equirectangular', 'output_width': 1920, 'output_height': 1080, 'fov': 90})
+
+    # cameras = [
+        # {'capture_type': 'basler', 'threaded': True},
+        # {'capture_type': 'ximea', 'threaded': True},
+        # {'capture_type': 'webcam', 'threaded': True},
         # {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},
         # {'capture_type': 'video_file', 'source': "media/geti_demo.mp4", 'loop': True, 'threaded': True},
         # {'capture_type': 'folder', 'source': "media/image_seq", 'sort_by': 'date', 'fps': 30, 'real_time': True, 'loop': True, 'threaded': False},
         # {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 800, 'h': 600, 'fps': 30, 'threaded': True}
-    ]
+    # ]
 
-    test_multiple_cameras(cameras, threaded=True)
+    # test_multiple_cameras(cameras, threaded=True)

@@ -88,7 +88,7 @@ class VideoCaptureBase(ABC):
         pass
     
     @abstractmethod
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Read a frame from the capture device.
         If background capture is running, returns the latest frame.
@@ -215,3 +215,39 @@ class VideoCaptureBase(ABC):
         """Context manager exit."""
         if self.is_connected:
             self.disconnect()
+            
+    def attach_processor(self, processor):
+        """Attach a frame processor to this camera."""
+        if not hasattr(self, '_processors'):
+            self._processors = []
+        self._processors.append(processor)
+        return processor
+    
+    def detach_processor(self, processor):
+        """Remove a processor from this camera."""
+        if hasattr(self, '_processors'):
+            if processor in self._processors:
+                self._processors.remove(processor)
+                return True
+        return False
+    
+    def clear_processors(self):
+        """Remove all processors."""
+        if hasattr(self, '_processors'):
+            self._processors.clear()
+
+    def get_processors(self):
+        """Get all attached processors."""
+        if not hasattr(self, '_processors'):
+            self._processors = []
+        return self._processors
+
+    def read(self):
+        """Read a frame from the camera and apply any attached processors."""
+        ret, frame = self._read_implementation()  # Your existing read logic
+        
+        if ret and frame is not None and hasattr(self, '_processors') and self._processors:
+            for processor in self._processors:
+                frame = processor.process(frame)
+        
+        return ret, frame

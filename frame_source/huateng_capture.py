@@ -90,7 +90,7 @@ class HuatengCapture(VideoCaptureBase):
             logger.error(f"Error reading from Huateng camera: {e}")
             return False, None
 
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
             return self.get_latest_frame()
         else:

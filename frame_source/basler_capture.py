@@ -173,7 +173,7 @@ class BaslerCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from Basler camera: {e}")
             return False
     
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
         """
@@ -228,7 +228,7 @@ class BaslerCapture(VideoCaptureBase):
             return self._exposure
         
         try:
-            return self.camera.ExposureTime.value
+            return self.camera.ExposureTime()
         except Exception:
             return self._exposure
     
