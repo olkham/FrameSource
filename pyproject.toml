@@ -12,6 +12,7 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.7"
+license = { file = "LICENSE" }
 dependencies = [
     "opencv-python",
     "numpy",
@@ -30,7 +31,6 @@ full = [
     "soundfile",
     "pyaudio"
 ]
-license = { file = "LICENSE" }
 
 [tool.black]
 line-length = 100
