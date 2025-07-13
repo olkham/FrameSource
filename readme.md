@@ -48,9 +48,24 @@ Or for development (editable) install:
 pip install -e .
 ```
 
-### Audio Spectrogram Dependencies
+### Installation Options
 
-For audio spectrogram capture, install additional dependencies:
+FrameSource supports optional dependencies for additional features:
+
+```sh
+# Basic installation (core frame sources only)
+pip install .
+
+# With audio spectrogram support
+pip install .[audio]
+
+# With all optional features
+pip install .[full]
+```
+
+### Manual Dependency Installation
+
+Alternatively, you can install audio dependencies manually:
 
 ```sh
 pip install librosa soundfile pyaudio
