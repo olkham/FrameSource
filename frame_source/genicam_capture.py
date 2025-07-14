@@ -158,7 +158,7 @@ class GenicamCapture(VideoCaptureBase):
             logger.error(f"Error reading from Genicam camera: {e}")
             return False, None
 
-    """Genicam camera capture using pypylon."""
+    """Genicam camera capture using genicam."""
     def __init__(self, source: Any = None, **kwargs):
         super().__init__(source, **kwargs)
         self.camera = None
@@ -259,7 +259,7 @@ class GenicamCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from Genicam camera: {e}")
             return False
 
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Return the latest frame captured by the background thread, or fall back to direct read if not running.
         """

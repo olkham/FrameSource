@@ -435,18 +435,19 @@ if __name__ == "__main__":
 
     from frame_source.genicam_capture import GenicamCapture
 
-    cti_files = ['/Library/Frameworks/pylon.framework/Versions/A/Libraries/gentlproducer/gtl/ProducerU3V.cti']
+    cti_files = [
+        # ['/Library/Frameworks/pylon.framework/Versions/A/Libraries/gentlproducer/gtl/ProducerU3V.cti']
     # '/opt/pylon/lib/gentlproducer/gtl/ProducerGEV.cti',
     # '/usr/lib/ids/cti/ids_gevgentl.cti',
     # '/usr/lib/ids/cti/ids_u3vgentl.cti',
-    # '/usr/lib/ids/cti/ids_ueyegentl.cti']
+    '/usr/lib/ids/cti/ids_ueyegentl.cti']
 
     genicam = GenicamCapture(0, width=1280, height=960, x=0, y=0, cti_files=cti_files, threaded=True)
     test_camera(genicam)
 
-     test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
-                            sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive',
-                            gamma_correction=0.7, noise_floor=-65, percentile_range=(10, 90))
+    # test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
+    #                         sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive',
+    #                         gamma_correction=0.7, noise_floor=-65, percentile_range=(10, 90))
 
     # test_camera('basler')
     # test_camera('ximea')
@@ -471,3 +472,4 @@ if __name__ == "__main__":
     # ]
 
     # test_multiple_cameras(cameras, threaded=True)
+
