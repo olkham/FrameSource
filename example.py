@@ -8,7 +8,7 @@ def test_audio_spectrogram(source=None, **kwargs):
     """Test audio spectrogram capture from microphone or audio file."""
     cv2.namedWindow("Audio Spectrogram", cv2.WINDOW_NORMAL)
     print("Testing Audio Spectrogram Capture:")
-    
+
     # Default audio parameters for good visualization
     audio_params = {
         'n_mels': 128,
@@ -19,16 +19,16 @@ def test_audio_spectrogram(source=None, **kwargs):
         'colormap': cv2.COLORMAP_VIRIDIS,
         **kwargs
     }
-    
+
     frame_source = FrameSourceFactory.create('audio_spectrogram', source=source, **audio_params)
-    
+
     if not frame_source.connect():
         print("Failed to connect to audio source")
         return
-    
+
     threaded = kwargs.get('threaded', True)  # Default to threaded mode
     print(f"Running in {'threaded' if threaded else 'blocking'} mode")
-    
+
     if threaded:
         frame_source.start()
         print("Started background spectrogram capture thread")
@@ -58,7 +58,7 @@ def test_audio_spectrogram(source=None, **kwargs):
             print(f"  Noise floor: {frame_source.get_noise_floor()} dB") # type: ignore
         if hasattr(frame_source, 'get_percentile_range'):
             print(f"  Percentile range: {frame_source.get_percentile_range()}%") # type: ignore
-        
+
         def print_help():
             print("\nKey controls:")
             print("  ESC - Quit")
@@ -66,7 +66,7 @@ def test_audio_spectrogram(source=None, **kwargs):
             print("  0 - Grayscale (default)")
             print("  1 - Viridis colormap")
             print("  2 - Plasma colormap")
-            print("  3 - Inferno colormap") 
+            print("  3 - Inferno colormap")
             print("  4 - Hot colormap")
             print("  5 - Jet colormap")
             print("  +/- - Adjust mel bands (requires restart)")
@@ -74,14 +74,14 @@ def test_audio_spectrogram(source=None, **kwargs):
             print("  g/G - Decrease/increase gamma correction")
             print("  n/N - Decrease/increase noise floor")
             print("  p/P - Adjust percentile range")
-        
+
         print_help()
-        
+
         while frame_source.is_connected:
             ret, frame = frame_source.read()
             if ret and frame is not None:
                 cv2.imshow("Audio Spectrogram", frame)
-                
+
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC key to quit
                 break
@@ -166,7 +166,7 @@ def test_audio_spectrogram(source=None, **kwargs):
     if threaded:
         frame_source.stop()
         print("Stopped background spectrogram capture thread")
-    
+
     frame_source.disconnect()
     cv2.destroyWindow("Audio Spectrogram")
 
@@ -177,11 +177,11 @@ def test_360_camera(name, **kwargs):
     print("Testing 360 Camera Capture:")
     camera = FrameSourceFactory.create(name, **kwargs)
     camera.connect()
-    
+
     # Set camera resolution and fps - insta360 x5 webcam mode settings
     camera.set_frame_size(2880, 1440)
     camera.set_fps(30)
-    
+
     # Add processor if specified
     if 'processor' in kwargs:
         processor_config = kwargs.pop('processor')
@@ -197,7 +197,7 @@ def test_360_camera(name, **kwargs):
     if camera.is_connected:
         print(f"Frame size: {camera.get_frame_size()}")
         print(f"FPS: {camera.get_fps()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
@@ -215,7 +215,7 @@ def test_360_camera(name, **kwargs):
                     if hasattr(camera, '_processors') and camera._processors:
                         print("\nProcessor controls:")
                         print("  w/s - Adjust pitch (up/down)")
-                        print("  a/d - Adjust yaw (left/right)")  
+                        print("  a/d - Adjust yaw (left/right)")
                         print("  q/e - Adjust roll (left/right)")
                         print("  r - Reset processor angles")
                 elif key == ord('w'):  # Pitch up
@@ -271,14 +271,18 @@ def test_360_camera(name, **kwargs):
             else:
                 print(f"Failed to read frame")
 
-    camera.disconnect() 
+    camera.disconnect()
 
 
 def test_camera(name, **kwargs):
     # Example 1: Webcam capture
     cv2.namedWindow("camera", cv2.WINDOW_NORMAL)
-    print("Testing Webcam Capture:")
-    camera = FrameSourceFactory.create(name, **kwargs)
+    print(f"Testing {name} Capture:")
+    if isinstance(name, str):
+        camera = FrameSourceFactory.create(name, **kwargs)
+    else:
+        camera = name
+
     camera.connect()
 
     threaded = kwargs.get('threaded', False)
@@ -288,9 +292,9 @@ def test_camera(name, **kwargs):
     width = kwargs.get('width', 1920)
     height = kwargs.get('height', 1080)
     fps = kwargs.get('fps', 30)
-    camera.set_frame_size(width, height)    
+    camera.set_frame_size(width, height)
     camera.set_fps(fps)
-    
+
     if camera.is_connected:
 
         exposure_range = camera.get_exposure_range()
@@ -298,7 +302,7 @@ def test_camera(name, **kwargs):
             min_exp, max_exp = exposure_range
         else:
             min_exp, max_exp = None, None
-            
+
         gain_range = camera.get_gain_range()
         if gain_range is not None:
             min_gain, max_gain = gain_range
@@ -309,7 +313,7 @@ def test_camera(name, **kwargs):
         try:
             # Enable auto gain only while keeping exposure fixed
             camera.enable_auto_exposure(True)  # Enable auto exposure/gain
-            
+
             print("Auto exposure/gain configured: exposure locked, gain variable")
         except Exception as e:
             print(f"Error configuring Ximea auto exposure/gain: {e}")
@@ -318,7 +322,7 @@ def test_camera(name, **kwargs):
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
@@ -327,7 +331,7 @@ def test_camera(name, **kwargs):
                     cv2.imshow("camera", frame)
                 # Add key controls for exposure and gain adjustment
                 key = cv2.waitKey(1) & 0xFF
-                
+
                 if key == ord('q'):
                     break
                 elif key == ord('=') or key == ord('+'):  # Increase exposure
@@ -376,9 +380,8 @@ def test_camera(name, **kwargs):
     camera.disconnect()
 
 
-def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
+def test_multiple_cameras(cameras: List[Any], threaded: bool = True):
     """Test connecting to multiple different cameras types and viewing them live concurrently."""
-    
 
     capture_instances = []
     grid_cols = 3
@@ -396,7 +399,7 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
         row = idx // grid_cols
         x = col * win_w
         y = row * win_h
-        cv2.moveWindow(f"{name}", x, y+(25* row))  # Add some vertical spacing
+        cv2.moveWindow(f"{name}", x, y + (25 * row))  # Add some vertical spacing
         print(f"Testing {name} Capture:")
         camera = FrameSourceFactory.create(name, **cam_cfg)
         if camera.connect():
@@ -429,11 +432,23 @@ def test_multiple_cameras(cameras:List[Any], threaded:bool = True):
 
 # Example usage and testing
 if __name__ == "__main__":
-    
-    test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
-                           sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive', 
-                           gamma_correction=0.7, noise_floor=-65, percentile_range=(10, 90))
-    
+
+    from frame_source.genicam_capture import GenicamCapture
+
+    cti_files = [
+        # ['/Library/Frameworks/pylon.framework/Versions/A/Libraries/gentlproducer/gtl/ProducerU3V.cti']
+    # '/opt/pylon/lib/gentlproducer/gtl/ProducerGEV.cti',
+    # '/usr/lib/ids/cti/ids_gevgentl.cti',
+    # '/usr/lib/ids/cti/ids_u3vgentl.cti',
+    '/usr/lib/ids/cti/ids_ueyegentl.cti']
+
+    genicam = GenicamCapture(0, width=1280, height=960, x=0, y=0, cti_files=cti_files, threaded=True)
+    test_camera(genicam)
+
+    # test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=5.0, freq_range=(20, 20000),
+    #                         sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive',
+    #                         gamma_correction=0.7, noise_floor=-65, percentile_range=(10, 90))
+
     # test_camera('basler')
     # test_camera('ximea')
     # test_camera('webcam', source=0, threaded=True, width=1920, height=1080, fps=30)   # standard 1080p webcam
@@ -446,6 +461,7 @@ if __name__ == "__main__":
     # test_360_camera('webcam', source=0, threaded=True, processor={'type': 'equirectangular', 'output_width': 1920, 'output_height': 1080, 'fov': 90})
 
     # cameras = [
+        # {'capture_type': 'genicam', 'threaded': True},
         # {'capture_type': 'basler', 'threaded': True},
         # {'capture_type': 'ximea', 'threaded': True},
         # {'capture_type': 'webcam', 'threaded': True},
@@ -456,3 +472,4 @@ if __name__ == "__main__":
     # ]
 
     # test_multiple_cameras(cameras, threaded=True)
+
