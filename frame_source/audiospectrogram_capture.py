@@ -115,7 +115,7 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         logger.info(f"Spectrogram params: n_mels={self.n_mels}, n_fft={self.n_fft}, "
                    f"window_duration={self.window_duration}s, freq_range={self.freq_range}")
     
-    def start(self):
+    def start_async(self):
         """
         Start background thread to continuously generate spectrogram frames.
         """

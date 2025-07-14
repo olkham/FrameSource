@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class BaslerCapture(VideoCaptureBase):
-    def start(self):
+    def start_async(self):
         """
         Start background thread to continuously capture frames from Basler camera.
         """

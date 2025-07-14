@@ -183,7 +183,7 @@ if __name__ == "__main__":
     import cv2
     camera = HuatengCapture(is_mono=False)
     if camera.connect():
-        camera.start()
+        camera.start_async()
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")

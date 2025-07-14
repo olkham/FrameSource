@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class IPCameraCapture(VideoCaptureBase):
-    def start(self):
+    def start_async(self):
         """
         Start background thread to continuously capture frames from IP camera.
         """
@@ -166,7 +166,7 @@ if __name__ == "__main__":
                                  username="admin", password="password")
     
     if camera.connect():
-        camera.start()
+        camera.start_async()
         print("IP Camera connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")

@@ -36,7 +36,7 @@ class ScreenCapture(VideoCaptureBase):
         self.is_connected = False
         self.time_of_last_frame = 0.0
 
-    def start(self):
+    def start_async(self):
         """
         Start background frame capture in a separate thread.
         Continuously updates self._latest_frame and self._latest_success.
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     # Example usage
     camera = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
     if camera.connect():
-        camera.start()
+        camera.start_async()
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")

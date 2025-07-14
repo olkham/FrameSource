@@ -30,7 +30,7 @@ class FolderCapture(VideoCaptureBase):
         self._latest_frame = None
         self._latest_success = False
 
-    def start(self):
+    def start_async(self):
         """
         Start background frame capture in a separate thread.
         Continuously updates self._latest_frame and self._latest_success.

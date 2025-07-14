@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class XimeaCapture(VideoCaptureBase):
-    def start(self):
+    def start_async(self):
         """
         Start background thread to continuously capture frames from Ximea camera.
         """
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     import cv2
     camera = XimeaCapture(is_mono=False)
     if camera.connect():
-        camera.start()
+        camera.start_async()
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")

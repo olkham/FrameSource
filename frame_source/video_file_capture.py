@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class VideoFileCapture(VideoCaptureBase):
-    def start(self):
+    def start_async(self):
         """
         Start background thread to continuously capture frames from video file.
         """

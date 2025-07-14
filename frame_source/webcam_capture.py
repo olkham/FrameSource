@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebcamCapture(VideoCaptureBase):
-    def start(self):
+    def start_async(self):
         """
         Start background thread to continuously capture frames from webcam.
         """
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # Example usage
     camera = WebcamCapture(source=0)
     if camera.connect():
-        camera.start()
+        camera.start_async()
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")

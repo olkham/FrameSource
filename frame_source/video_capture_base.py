@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Any
 
 class VideoCaptureBase(ABC):
-    def start(self):
+    def start_async(self):
         """
         Start background frame capture in a separate thread.
         Continuously updates self._latest_frame and self._latest_success.

@@ -98,7 +98,7 @@ cap.disconnect()
 # Folder of images
 cap = FrameSourceFactory.create('folder', source='media/image_seq', sort_by='date', fps=10, loop=True)
 cap.connect()
-cap.start()  # For background capture
+cap.start_async()  # For background capture
 while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
@@ -125,7 +125,7 @@ cap.disconnect()
 from frame_source.screen_capture import ScreenCapture
 cap = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
 cap.connect()
-cap.start()  # For background capture (optional)
+cap.start_async()  # For background capture (optional)
 while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
@@ -144,7 +144,7 @@ cap = FrameSourceFactory.create('audio_spectrogram',
                               freq_range=(20, 8000),
                               colormap=cv2.COLORMAP_VIRIDIS)
 cap.connect()
-cap.start()  # Start background audio processing
+cap.start_async()  # Start background audio processing
 while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
