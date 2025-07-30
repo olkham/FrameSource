@@ -1,7 +1,11 @@
+import time
+
 import cv2
 from typing import Any, List
+
 from frame_source import FrameSourceFactory
 from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+from frame_source.realsense_capture import RealsenseCapture
 
 
 def test_audio_spectrogram(source=None, **kwargs):
@@ -430,13 +434,21 @@ def test_multiple_cameras(cameras: List[Any], threaded: bool = True):
             print(f"Disconnected from {name}")
 
 
-# Example usage and testing
 if __name__ == "__main__":
 
-    test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=3.0, freq_range=(20, 20000),
-                           sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive',
-                           gamma_correction=2.0, noise_floor=-45, percentile_range=(0, 100), colormap=cv2.COLORMAP_INFERNO)
+    # test_audio_spectrogram(source=None, threaded=True, n_mels=256, window_duration=3.0, freq_range=(20, 20000),
+    #                        sample_rate=44100, db_range=(-60, 0), contrast_method='adaptive',
+    #                        gamma_correction=2.0, noise_floor=-45, percentile_range=(0, 100), colormap=cv2.COLORMAP_INFERNO)
 
+    #### Advanced realsense demo
+    from frame_processors import RealsenseDepthProcessor
+    from frame_processors.realsense_depth_processor import RealsenseProcessingOutput
+    camera = RealsenseCapture(width=640, height=480)
+    processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
+    camera.attach_processor(processor)
+    test_camera(camera)
+
+    #### Other demos
     # test_camera('basler')
     # test_camera('ximea')
     # test_camera('webcam', source=0, threaded=True, width=1920, height=1080, fps=30)   # standard 1080p webcam
