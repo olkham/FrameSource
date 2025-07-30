@@ -18,6 +18,7 @@ from typing import Any
 import logging
 
 from .genicam_capture import GenicamCapture
+from .realsense_capture import RealsenseCapture
 from .video_capture_base import VideoCaptureBase
 from .basler_capture import BaslerCapture
 from .ximea_capture import XimeaCapture
@@ -43,6 +44,7 @@ class FrameSourceFactory:
         'ipcam': IPCameraCapture,
         'ximea': XimeaCapture,
         'basler': BaslerCapture,
+        'realsense': RealsenseCapture,
         'screen': ScreenCapture,
         'genicam': GenicamCapture,
         'audio_spectrogram': AudioSpectrogramCapture

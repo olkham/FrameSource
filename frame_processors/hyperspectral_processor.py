@@ -1,6 +1,4 @@
-
-import numpy as np
-from frame_processor import FrameProcessor
+from .frame_processor import FrameProcessor, FrameType
 
 
 class HyperspectralChannelSelector(FrameProcessor):
@@ -17,7 +15,7 @@ class HyperspectralChannelSelector(FrameProcessor):
             'false_color': False
         }
     
-    def process(self, frame: np.ndarray) -> np.ndarray:
+    def process(self, frame: FrameType) -> FrameType:
         """Extract the specified channel from hyperspectral data."""
         # Implementation depends on your hyperspectral data format
         channel = self._parameters['channel']
