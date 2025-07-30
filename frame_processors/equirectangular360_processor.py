@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 from numba import njit, prange
 
-from .frame_processor import FrameProcessor
+from .frame_processor import FrameProcessor, FrameType
+
 
 # Optimized functions using Numba for better performance
 @njit(cache=True, fastmath=True)
@@ -229,7 +230,7 @@ class Equirectangular2PinholeProcessor(FrameProcessor):
         self._map_cache = {}
         self._cache_size_limit = 50
     
-    def process(self, frame: np.ndarray) -> np.ndarray:
+    def process(self, frame: FrameType) -> FrameType:
         """Convert equirectangular frame to pinhole projection."""
         roll = self._parameters['roll']
         pitch = self._parameters['pitch']

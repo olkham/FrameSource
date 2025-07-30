@@ -108,6 +108,21 @@ cap.disconnect()
 
 ### 2. Direct Use
 
+#### Intel Realsense
+```python
+from frame_processors import RealsenseDepthProcessor
+from frame_processors.realsense_depth_processor import RealsenseProcessingOutput
+cap = RealsenseCapture(width=640, height=480)
+processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
+cap.attach_processor(processor)
+cap.connect()
+while cap.is_connected:
+    ret, frame = cap.read()
+    if not ret:
+        break
+cap.disconnect()
+```
+
 #### Folder of Images
 ```python
 from frame_source.folder_capture import FolderCapture
