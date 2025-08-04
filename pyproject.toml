@@ -26,10 +26,14 @@ audio = [
     "soundfile", 
     "pyaudio"
 ]
+realsense = [
+    "pyrealsense2"
+]
 full = [
     "librosa",
     "soundfile",
-    "pyaudio"
+    "pyaudio",
+    "pyrealsense2"
 ]
 
 [tool.black]

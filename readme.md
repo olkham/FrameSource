@@ -59,8 +59,14 @@ pip install .
 # With audio spectrogram support
 pip install .[audio]
 
+# With RealSense camera support
+pip install .[realsense]
+
 # With all optional features
 pip install .[full]
+
+# Multiple extras at once
+pip install .[audio,realsense]
 ```
 
 ### Manual Dependency Installation
