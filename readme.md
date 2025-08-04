@@ -6,13 +6,20 @@ FrameSource is a flexible, extensible Python framework for acquiring frames from
 
 ## Supported Sources
 
-- 🖥️ **Webcam** (OpenCV)
-- 🌐 **IP Camera** (RTSP/HTTP)
-- 🎥 **Video File** (MP4, AVI, etc.)
-- 🗂️ **Folder of Images** (sorted by name or creation time)
-- 🏭 **Industrial Cameras** (e.g., Ximea, Basler, Huateng)
-- 🖼️ **Screen Capture** (live region of your desktop)
-- 🎵 **Audio Spectrogram** (microphone or audio file as visual frames)
+### Camera Sources
+- 🖥️ **Webcam** (OpenCV) - Standard USB webcams, built-in laptop cameras
+- 🌐 **IP Camera** (RTSP/HTTP) - Network cameras, security cameras
+- 🏭 **Industrial Cameras**:
+  - **Basler** cameras (via pypylon SDK) - High-performance industrial imaging
+  - **Ximea** cameras - Scientific and machine vision cameras
+  - **Huateng** cameras - Cost-effective industrial cameras
+- 🔍 **Intel RealSense** - RGB-D cameras with depth sensing (tested with D456)
+
+### Media Sources  
+- 🎥 **Video File** (MP4, AVI, etc.) - Playback with looping and controls
+- 🗂️ **Folder of Images** - Sorted by name or creation time with configurable FPS
+- 🖼️ **Screen Capture** - Live region capture from desktop
+- 🎵 **Audio Spectrogram** - Real-time audio visualization from microphone or files
 
 ## Demo
 
@@ -59,6 +66,9 @@ pip install .
 # With audio spectrogram support
 pip install .[audio]
 
+# With Basler camera support
+pip install .[basler]
+
 # With RealSense camera support
 pip install .[realsense]
 
@@ -66,18 +76,27 @@ pip install .[realsense]
 pip install .[full]
 
 # Multiple extras at once
-pip install .[audio,realsense]
+pip install .[audio,basler,realsense]
 ```
 
 ### Manual Dependency Installation
 
-Alternatively, you can install audio dependencies manually:
+Alternatively, you can install dependencies manually:
 
 ```sh
+# Audio processing
 pip install librosa soundfile pyaudio
+
+# Basler cameras
+pip install pypylon
+
+# RealSense cameras
+pip install pyrealsense2
 ```
 
 ## Example Usage
+
+> 💡 **Tip**: For comprehensive examples of each capture type, see the `examples/` directory. Run `python examples/run_examples.py` for an interactive demo menu.
 
 ### 1. Using the Factory
 
@@ -114,10 +133,13 @@ cap.disconnect()
 
 ### 2. Direct Use
 
-#### Intel Realsense
+#### Intel RealSense Camera
 ```python
+from frame_source.realsense_capture import RealsenseCapture
 from frame_processors import RealsenseDepthProcessor
 from frame_processors.realsense_depth_processor import RealsenseProcessingOutput
+
+# Tested with Intel RealSense D456 camera
 cap = RealsenseCapture(width=640, height=480)
 processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
 cap.attach_processor(processor)
@@ -126,6 +148,7 @@ while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
         break
+    # Frame contains RGB and depth side-by-side or other configured format
 cap.disconnect()
 ```
 

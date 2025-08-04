@@ -31,11 +31,14 @@ def main():
     processor = Equirectangular2PinholeProcessor(
         output_width=1920,
         output_height=1080,
-        fov=90,
-        pitch=0.0,
-        yaw=0.0,
-        roll=0.0
+        fov=90
     )
+    
+    # Set initial viewing angles (these are parameters, not constructor args)
+    processor.set_parameter('pitch', 0.0)
+    processor.set_parameter('yaw', 0.0)
+    processor.set_parameter('roll', 0.0)
+    
     camera.attach_processor(processor)
     
     camera.start_async()
