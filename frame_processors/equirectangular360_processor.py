@@ -215,6 +215,8 @@ def generate_mapping_jit_ultra_parallel(output_width, output_height, focal_lengt
 class Equirectangular2PinholeProcessor(FrameProcessor):
     """Convert equirectangular 360 frames to pinhole projections."""
     
+
+
     def __init__(self, fov: float = 90.0, output_width: int = 1920, output_height: int = 1080):
         super().__init__()
         self._parameters = {
@@ -348,3 +350,90 @@ class Equirectangular2PinholeProcessor(FrameProcessor):
     def clear_cache(self) -> None:
         """Clear the coordinate mapping cache."""
         self._map_cache.clear()
+    
+    def pixel_to_spherical(self, x: int, y: int, frame_width: int, frame_height: int) -> Tuple[float, float]:
+        """
+        Convert pixel coordinates in equirectangular image to spherical coordinates.
+        
+        Args:
+            x: Pixel x coordinate (0 to frame_width-1)
+            y: Pixel y coordinate (0 to frame_height-1)
+            frame_width: Width of the equirectangular frame
+            frame_height: Height of the equirectangular frame
+            
+        Returns:
+            Tuple of (longitude_deg, latitude_deg) where:
+            - longitude_deg: -180° to +180° (yaw)
+            - latitude_deg: -90° to +90° (pitch, inverted for correct orientation)
+        """
+        # Convert pixel coordinates to spherical coordinates
+        # Equirectangular mapping: x -> longitude (-180° to +180°), y -> latitude (-90° to +90°)
+        longitude_deg = (x / frame_width) * 360.0 - 180.0  # -180 to +180
+        latitude_deg = (y / frame_height) * 180.0 - 90.0   # -90 to +90
+        
+        return longitude_deg, latitude_deg
+    
+    def spherical_to_processor_angles(self, longitude_deg: float, latitude_deg: float, current_roll: float = 0.0) -> Tuple[float, float, float]:
+        """
+        Convert spherical coordinates to processor angles.
+        
+        Args:
+            longitude_deg: Longitude in degrees (-180° to +180°)
+            latitude_deg: Latitude in degrees (-90° to +90°)
+            current_roll: Current roll value to preserve (default: 0.0)
+            
+        Returns:
+            Tuple of (yaw, pitch, roll) where:
+            - yaw: longitude (left/right rotation)
+            - pitch: -latitude (up/down rotation, inverted)
+            - roll: preserved current_roll value
+        """
+        yaw = longitude_deg
+        pitch = -latitude_deg  # Invert for correct orientation
+        roll = current_roll  # Preserve current roll
+        
+        return yaw, pitch, roll
+    
+    def processor_angles_to_equirectangular_coords(self, yaw: float, pitch: float, roll: float, 
+                                                  frame_width: int, frame_height: int) -> Tuple[int, int]:
+        """
+        Convert processor angles to equirectangular pixel coordinates.
+        
+        Args:
+            yaw: Yaw angle in degrees
+            pitch: Pitch angle in degrees  
+            roll: Roll angle in degrees (used for 3D calculations)
+            frame_width: Width of the equirectangular frame
+            frame_height: Height of the equirectangular frame
+            
+        Returns:
+            Tuple of (x, y) pixel coordinates in the equirectangular image
+        """
+        # Convert angles to radians
+        pitch_rad = math.radians(-pitch)  # Invert pitch for calculations
+        yaw_rad = math.radians(yaw)
+        
+        # For center of projected image, calculate 3D ray direction
+        cos_pitch = math.cos(pitch_rad)
+        sin_pitch = math.sin(pitch_rad)
+        cos_yaw = math.cos(yaw_rad)
+        sin_yaw = math.sin(yaw_rad)
+        
+        # Apply pitch and yaw rotation to forward vector
+        ray_x = sin_yaw * cos_pitch
+        ray_y = -sin_pitch
+        ray_z = cos_yaw * cos_pitch
+        
+        # Convert 3D ray to equirectangular coordinates
+        longitude = math.atan2(ray_x, ray_z)
+        latitude = math.asin(ray_y)
+        
+        # Convert to pixel coordinates in equirectangular image
+        eq_x = int((longitude + math.pi) / (2 * math.pi) * frame_width)
+        eq_y = int((math.pi/2 - latitude) / math.pi * frame_height)
+        
+        # Clamp to image bounds
+        eq_x = max(0, min(eq_x, frame_width - 1))
+        eq_y = max(0, min(eq_y, frame_height - 1))
+        
+        return eq_x, eq_y

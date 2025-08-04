@@ -11,10 +11,69 @@ from frame_source import FrameSourceFactory
 from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
 
 
+
 def main():
     """Test 360 camera with equirectangular to pinhole projection."""
     cv2.namedWindow("360 Camera", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("Projected", cv2.WINDOW_NORMAL)
+
     print("Testing 360 Camera Capture:")
+    
+    # Global variables for mouse callback
+    processor = None
+    mouse_dragging = False
+    
+    def mouse_callback(event, x, y, flags, param):
+        """Handle mouse interactions on the equirectangular image."""
+        nonlocal processor, mouse_dragging
+        
+        if processor is None:
+            return
+            
+        # Handle mouse wheel for FOV adjustment
+        if event == cv2.EVENT_MOUSEWHEEL:
+            current_fov = processor.get_parameter('fov') or 90
+            # Mouse wheel delta is positive for scroll up, negative for scroll down
+            delta = flags  # In OpenCV, flags contains the wheel delta for mouse wheel events
+            fov_change = 5 if delta > 0 else -5
+            new_fov = max(10, min(180, current_fov + fov_change))
+            processor.set_parameter('fov', new_fov)
+            print(f"Mouse wheel -> FOV: {new_fov}°")
+            return
+        
+        # Handle mouse button events
+        if event == cv2.EVENT_LBUTTONDOWN:
+            mouse_dragging = True
+        elif event == cv2.EVENT_LBUTTONUP:
+            mouse_dragging = False
+        
+        # Update angles when clicking or dragging
+        if (event == cv2.EVENT_LBUTTONDOWN or 
+            (event == cv2.EVENT_MOUSEMOVE and mouse_dragging)):
+            
+            # Get image dimensions
+            frame_width = param['frame_width']
+            frame_height = param['frame_height']
+            
+            # Convert pixel coordinates to spherical coordinates using helper function
+            longitude_deg, latitude_deg = processor.pixel_to_spherical(
+                x, y, frame_width, frame_height
+            )
+            
+            # Convert to processor angles using helper function
+            current_roll = processor.get_parameter('roll') or 0.0
+            yaw, pitch, roll = processor.spherical_to_processor_angles(
+                longitude_deg, latitude_deg, current_roll
+            )
+            
+            # Set processor angles
+            processor.set_parameter('yaw', yaw)
+            processor.set_parameter('pitch', pitch)
+            processor.set_parameter('roll', roll)
+            
+            # Only print on initial click to avoid spam during dragging
+            if event == cv2.EVENT_LBUTTONDOWN:
+                print(f"Clicked at pixel ({x}, {y}) -> Set angles: yaw={yaw:.1f}°, pitch={pitch:.1f}°, roll={roll:.1f}°")
     
     # Create webcam capture for 360 camera (adjust source as needed)
     camera = FrameSourceFactory.create('webcam', source=0, threaded=True)
@@ -39,7 +98,11 @@ def main():
     processor.set_parameter('yaw', 0.0)
     processor.set_parameter('roll', 0.0)
     
-    camera.attach_processor(processor)
+    # Set up mouse callback for interactive clicking
+    mouse_params = {'frame_width': 2880, 'frame_height': 1440}
+    cv2.setMouseCallback("360 Camera", mouse_callback, mouse_params)
+    
+    # camera.attach_processor(processor)
     
     camera.start_async()
     
@@ -52,6 +115,9 @@ def main():
             print("\n360 Camera Controls:")
             print("  ESC - Quit")
             print("  h - Show this help")
+            print("  LEFT CLICK - Click anywhere on 360° image to look in that direction")
+            print("  DRAG - Hold left mouse button and drag to continuously pan view")
+            print("  MOUSE WHEEL - Scroll to adjust FOV (field of view)")
             print("  w/s - Adjust pitch (up/down)")
             print("  a/d - Adjust yaw (left/right)")
             print("  q/e - Adjust roll (left/right)")
@@ -62,9 +128,56 @@ def main():
         
         while camera.is_connected:
             ret, frame = camera.read()
-            if ret and frame is not None:
-                cv2.imshow("360 Camera", frame)
+            # if ret and frame is not None:
+                # cv2.imshow("360 Camera", frame)
             
+            if frame is not None:
+                # Update mouse callback parameters with actual frame dimensions
+                mouse_params['frame_width'] = frame.shape[1]
+                mouse_params['frame_height'] = frame.shape[0]
+                
+                # Create a copy for display to avoid modifying the original frame
+                display_frame = frame.copy()
+                projected = processor.process(frame)  # Process original frame
+                
+                # Ensure projected is a numpy array (not dict)
+                if isinstance(projected, dict):
+                    continue  # Skip this frame if processor returns unexpected format
+                
+                # Back-project center of projected image to equirectangular coordinates using static helper
+                center_x_proj = projected.shape[1] // 2
+                center_y_proj = projected.shape[0] // 2
+
+                # Get current processor angles
+                pitch = processor.get_parameter('pitch') or 0
+                yaw = processor.get_parameter('yaw') or 0
+                roll = processor.get_parameter('roll') or 0
+
+                # Convert processor angles to equirectangular coordinates using helper function
+                eq_x, eq_y = processor.processor_angles_to_equirectangular_coords(
+                    yaw, pitch, roll, frame.shape[1], frame.shape[0]
+                )
+
+                # Draw crosshair on DISPLAY COPY of equirectangular frame (green)
+                cv2.line(display_frame, (eq_x - 15, eq_y), (eq_x + 15, eq_y), (0, 255, 0), 3)
+                cv2.line(display_frame, (eq_x, eq_y - 15), (eq_x, eq_y + 15), (0, 255, 0), 3)
+
+                # Draw crosshair on projected frame center (yellow)
+                cv2.line(projected, (center_x_proj - 15, center_y_proj), (center_x_proj + 15, center_y_proj), (0, 255, 255), 3)
+                cv2.line(projected, (center_x_proj, center_y_proj - 15), (center_x_proj, center_y_proj + 15), (0, 255, 255), 3)
+
+                # Display both frames
+                cv2.imshow("360 Camera", display_frame)
+                cv2.imshow("Projected", projected)
+
+                # Only print coordinates occasionally to reduce flickering
+                frame_count = getattr(main, 'frame_count', 0)
+                main.frame_count = frame_count + 1
+                if frame_count % 30 == 0:  # Print every 30 frames (~1 second at 30fps)
+                    print(f"Center projects to equirectangular coords: ({eq_x}, {eq_y}) | Angles: pitch={pitch:.1f}°, yaw={yaw:.1f}°")
+                
+                
+
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC key to quit
                 break

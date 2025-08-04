@@ -25,6 +25,16 @@ FrameSource is a flexible, extensible Python framework for acquiring frames from
 
 ![FrameSource Demo](media/demo.gif)
 
+### Interactive 360° Camera Demo
+
+![Interactive 360° Demo](media/interactive_360_demo.gif)
+
+The 360° camera example (`examples/camera_360_example.py`) provides an intuitive interface for exploring equirectangular footage:
+- **Click & Drag**: Click anywhere on the 360° image and drag to smoothly pan the view
+- **Mouse Wheel**: Scroll to zoom in/out by adjusting the field of view
+- **Keyboard Controls**: Fine-tune pitch, yaw, roll, and FOV with precise keyboard shortcuts
+- **Real-time Processing**: Live conversion from equirectangular to pinhole projection
+
 ## Why FrameSource?
 
 When I work on computer vision, robotics, or video analytics projects, I often need to swap between different sources of frames: a webcam for quick tests, a folder of images for batch processing, a video file for reproducibility, or a specialized camera for deployment. FrameSource lets me do this with minimal code changes—just swap the provider!
@@ -215,14 +225,15 @@ FrameSource includes powerful frame processors for specialized transformations:
 
 ### Equirectangular 360° to Pinhole Projection
 
-Convert 360° equirectangular footage to normal pinhole camera views:
+Convert 360° equirectangular footage to normal pinhole camera views with interactive controls:
 
 ```python
 from frame_source import FrameSourceFactory
 from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
 
-# Load 360° video
+# Load 360° video or connect to 360° webcam
 cap = FrameSourceFactory.create('video_file', source='360_video.mp4')
+# Or for live 360° camera: cap = FrameSourceFactory.create('webcam', source=0)
 cap.connect()
 
 # Create processor for 90° FOV pinhole view
@@ -248,6 +259,8 @@ while cap.is_connected:
 
 cap.disconnect()
 ```
+
+> 💡 **Interactive Demo**: Try `python examples/camera_360_example.py` for a fully interactive 360° viewer with mouse controls! Click and drag on the equirectangular image to look around, use the mouse wheel to zoom, and keyboard shortcuts for fine adjustments.
 
 You can also manually process frames without attaching:
 
