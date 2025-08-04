@@ -26,6 +26,9 @@ audio = [
     "soundfile", 
     "pyaudio"
 ]
+basler = [
+    "pypylon"
+]
 realsense = [
     "pyrealsense2"
 ]
@@ -33,6 +36,7 @@ full = [
     "librosa",
     "soundfile",
     "pyaudio",
+    "pypylon",
     "pyrealsense2"
 ]
 
