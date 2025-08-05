@@ -63,17 +63,24 @@ class RealsenseCapture(VideoCaptureBase):
         if not self.is_connected or self.pipeline is None:
             return False, None
 
-        # Wait for a coherent pair of frames: depth and color
-        frames = self.pipeline.wait_for_frames()
-        aligned = self._align.process(frames)
+        try:
+            # Wait for a coherent pair of frames: depth and color
+            frames = self.pipeline.wait_for_frames()
+            aligned = self._align.process(frames)
 
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
-        aligned_depth_frame = aligned.get_depth_frame()
-        aligned_color_frame = aligned.get_color_frame()
+            depth_frame = frames.get_depth_frame()
+            color_frame = frames.get_color_frame()
+            aligned_depth_frame = aligned.get_depth_frame()
+            aligned_color_frame = aligned.get_color_frame()
 
-        if not depth_frame or not color_frame:
-            return False, None
+            if not depth_frame or not color_frame:
+                return False, None
+        except RuntimeError as e:
+            # Handle case where pipeline has been stopped
+            if "wait_for_frames cannot be called before start()" in str(e):
+                return False, None
+            else:
+                raise  # Re-raise other runtime errors
 
         # if depth_frame and color_frame:
         #     print("Depth Intrinsics:", depth_frame.profile.as_video_stream_profile().get_intrinsics())
