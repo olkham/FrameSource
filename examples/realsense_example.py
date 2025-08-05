@@ -17,7 +17,8 @@ def main():
     print("Testing RealSense Camera:")
     
     # Create RealSense capture
-    camera = RealsenseCapture(width=640, height=480)
+    frame_processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.RGB)
+    camera = RealsenseCapture(width=640, height=480, processor=frame_processor)
     camera.start_async()
     
     if not camera.connect():
