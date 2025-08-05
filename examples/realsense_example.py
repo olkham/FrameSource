@@ -18,10 +18,7 @@ def main():
     
     # Create RealSense capture
     camera = RealsenseCapture(width=640, height=480)
-    
-    # Create depth processor for side-by-side view
-    processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
-    camera.attach_processor(processor)
+    camera.start_async()
     
     if not camera.connect():
         print("Failed to connect to RealSense camera")
@@ -55,19 +52,19 @@ def main():
             elif key == ord('h'):
                 print_help()
             elif key == ord('1'):  # RGB only
-                processor.output_format = RealsenseProcessingOutput.RGB
+                camera._processors[0].output_format = RealsenseProcessingOutput.RGB
                 print("Output: RGB only")
             elif key == ord('2'):  # Depth only (grayscale)
-                processor.output_format = RealsenseProcessingOutput.ALIGNED_DEPTH
+                camera._processors[0].output_format = RealsenseProcessingOutput.ALIGNED_DEPTH
                 print("Output: Depth only (grayscale)")
             elif key == ord('3'):  # Depth colorized
-                processor.output_format = RealsenseProcessingOutput.ALIGNED_DEPTH_COLORIZED
+                camera._processors[0].output_format = RealsenseProcessingOutput.ALIGNED_DEPTH_COLORIZED
                 print("Output: Depth colorized")
             elif key == ord('4'):  # Side-by-side
-                processor.output_format = RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE
+                camera._processors[0].output_format = RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE
                 print("Output: Aligned side-by-side")
             elif key == ord('5'):  # RGBD
-                processor.output_format = RealsenseProcessingOutput.RGBD
+                camera._processors[0].output_format = RealsenseProcessingOutput.RGBD
                 print("Output: RGBD combined")
     
     camera.disconnect()

@@ -4,6 +4,7 @@ import cv2
 import logging
 from .video_capture_base import VideoCaptureBase
 import platform
+from frame_processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +51,7 @@ class RealsenseCapture(VideoCaptureBase):
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
         frame = getattr(self, '_latest_frame', None)
+        self._latest_frame = None  # Clear after reading to avoid stale data
         return (frame is not None), frame
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
@@ -102,7 +104,12 @@ class RealsenseCapture(VideoCaptureBase):
         self._max_width = 0
         self._max_height = 0
         self._max_fps = 0
-
+        
+        self._default_processor = self.config.get("default_processor", None)
+        if self._default_processor is None:
+            self._default_processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.RGB)
+            self.attach_processor(self._default_processor)
+        
         self.source = source if isinstance(source, int) else 0
 
         if 'is_mono' in kwargs:

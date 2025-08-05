@@ -41,7 +41,7 @@ class WebcamCapture(VideoCaptureBase):
             success, frame = self._read_direct()
             if success:
                 self._latest_frame = frame
-            time.sleep(0.01)  # ~100 FPS max, adjust as needed
+            # time.sleep(0.01)  # ~100 FPS max, adjust as needed
 
     def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
@@ -50,6 +50,7 @@ class WebcamCapture(VideoCaptureBase):
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
         frame = getattr(self, '_latest_frame', None)
+        self._latest_frame = None  # Clear after reading to avoid stale data
         return (frame is not None), frame
 
     def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
