@@ -105,10 +105,10 @@ class RealsenseCapture(VideoCaptureBase):
         self._max_height = 0
         self._max_fps = 0
         
-        self._default_processor = self.config.get("default_processor", None)
+        self._default_processor = self.config.get("processor", None)
         if self._default_processor is None:
             self._default_processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.RGB)
-            self.attach_processor(self._default_processor)
+        self.attach_processor(self._default_processor)
         
         self.source = source if isinstance(source, int) else 0
 
