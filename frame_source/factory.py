@@ -96,5 +96,10 @@ class FrameSourceFactory:
         """Get list of available capture types."""
         return list(cls._capture_types.keys())
 
-
-
+    @classmethod
+    def unregister_capture_type(cls, capture_type: str):
+        """Unregister a capture type (convenience function)"""
+        if capture_type not in cls._capture_types:
+            raise ValueError(f"Capture type '{capture_type}' is not registered")
+        del cls._capture_types[capture_type]
+        logger.info(f"Unregistered capture type: {capture_type}")
