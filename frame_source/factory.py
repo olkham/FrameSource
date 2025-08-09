@@ -51,7 +51,7 @@ class FrameSourceFactory:
     }
     
     @classmethod
-    def create(cls, capture_type: str, source: Any = None, **kwargs) -> VideoCaptureBase:
+    def create(cls, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:
         """
         Create a video capture instance.
         
@@ -66,12 +66,17 @@ class FrameSourceFactory:
         Raises:
             ValueError: If capture_type is not supported
         """
-        if capture_type not in cls._capture_types:
+        # If capture_type is not provided, try to get it from kwargs
+        if not capture_type:
+            capture_type = kwargs.pop('capture_type', '')
+        
+        if not capture_type or capture_type not in cls._capture_types:
             available_types = ', '.join(cls._capture_types.keys())
             raise ValueError(f"Unsupported capture type: {capture_type}. Available types: {available_types}")
         
         capture_class = cls._capture_types[capture_type]
         return capture_class(source=source, **kwargs)
+
     
     @classmethod
     def register_capture_type(cls, name: str, capture_class: type):
