@@ -67,6 +67,9 @@ class VideoCaptureBase(ABC):
         self.config = kwargs
         self.type = self.__class__.__name__
         
+    def __str__(self) -> str:
+        return f"{self.type}(source={self.source}, connected={self.is_connected})"
+
     @abstractmethod
     def connect(self) -> bool:
         """
