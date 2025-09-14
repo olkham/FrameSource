@@ -35,22 +35,18 @@ class FolderWatcherHandler:
     def __init__(self, folder_capture_instance):
         self.folder_capture = folder_capture_instance
         self.valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
-        self.pending_refresh = False
-        self.refresh_timer = None
-        self.batch_delay = 0.5  # Wait 500ms after last event before refreshing
-        self.timer_lock = threading.Lock()
     
     def on_created(self, event):
         """Handle file creation events."""
         if not event.is_directory and self._is_image_file(event.src_path):
             logger.info(f"New image file detected: {event.src_path}")
-            self._schedule_batch_refresh()
+            self._add_file(event.src_path)
     
     def on_deleted(self, event):
         """Handle file deletion events."""
         if not event.is_directory and self._is_image_file(event.src_path):
             logger.info(f"Image file deleted: {event.src_path}")
-            self._schedule_batch_refresh()
+            self._remove_file(event.src_path)
     
     def on_moved(self, event):
         """Handle file move/rename events."""
@@ -58,38 +54,78 @@ class FolderWatcherHandler:
             src_is_image = self._is_image_file(event.src_path)
             dest_is_image = self._is_image_file(event.dest_path)
             
-            if src_is_image or dest_is_image:
-                logger.info(f"Image file moved/renamed: {event.src_path} -> {event.dest_path}")
-                self._schedule_batch_refresh()
+            if src_is_image and dest_is_image:
+                # Image renamed to another image
+                logger.info(f"Image file renamed: {event.src_path} -> {event.dest_path}")
+                self._rename_file(event.src_path, event.dest_path)
+            elif src_is_image:
+                # Image renamed to non-image (effectively deleted)
+                logger.info(f"Image file removed: {event.src_path}")
+                self._remove_file(event.src_path)
+            elif dest_is_image:
+                # Non-image renamed to image (effectively added)
+                logger.info(f"Image file added: {event.dest_path}")
+                self._add_file(event.dest_path)
     
     def _is_image_file(self, file_path):
         """Check if file is an image based on extension."""
         return file_path.lower().endswith(self.valid_exts)
     
-    def _schedule_batch_refresh(self):
-        """Schedule a batched refresh that waits for multiple events to settle."""
-        import threading
-        
-        with self.timer_lock:
-            # Cancel any existing timer
-            if self.refresh_timer is not None:
-                self.refresh_timer.cancel()
+    def _add_file(self, file_path):
+        """Add a new file to the list immediately."""
+        if file_path not in self.folder_capture.image_files:
+            self.folder_capture.image_files.append(file_path)
+            # Re-sort the list according to the current sorting preference
+            if self.folder_capture.sort_by == 'date':
+                self.folder_capture.image_files.sort(key=lambda x: os.path.getctime(x) if os.path.exists(x) else 0)
+            else:
+                self.folder_capture.image_files.sort()
             
-            # Set up a new timer
-            self.refresh_timer = threading.Timer(self.batch_delay, self._execute_refresh)
-            self.refresh_timer.start()
-            self.pending_refresh = True
+            self.folder_capture._last_file_count = len(self.folder_capture.image_files)
+            logger.info(f"Added file to list: {file_path} (total: {len(self.folder_capture.image_files)})")
     
-    def _execute_refresh(self):
-        """Execute the actual refresh after the batch delay."""
-        with self.timer_lock:
-            if self.pending_refresh:
-                self.pending_refresh = False
-                self.refresh_timer = None
-                # Schedule refresh in a separate thread to avoid blocking
-                import threading
-                threading.Thread(target=self.folder_capture._refresh_file_list_async, daemon=True).start()
-                logger.info("Executing batched file list refresh")
+    def _remove_file(self, file_path):
+        """Remove a file from the list immediately."""
+        if file_path in self.folder_capture.image_files:
+            # Store current position before removal
+            current_index = self.folder_capture.index - 1 if self.folder_capture.index > 0 else 0
+            was_current_file = (current_index < len(self.folder_capture.image_files) and 
+                              self.folder_capture.image_files[current_index] == file_path)
+            
+            # Get the index of the file to be removed before removing it
+            removed_index = self.folder_capture.image_files.index(file_path)
+            
+            self.folder_capture.image_files.remove(file_path)
+            self.folder_capture._last_file_count = len(self.folder_capture.image_files)
+            
+            # Adjust index if the removed file was at or before current position
+            if removed_index <= current_index:
+                if was_current_file:
+                    # Current file was removed, stay at same index (will get next file)
+                    pass
+                else:
+                    # File before current was removed, adjust index
+                    self.folder_capture.index = max(0, self.folder_capture.index - 1)
+            
+            # Ensure index is within bounds
+            if self.folder_capture.index >= len(self.folder_capture.image_files):
+                self.folder_capture.index = max(0, len(self.folder_capture.image_files) - 1)
+            
+            logger.info(f"Removed file from list: {file_path} (total: {len(self.folder_capture.image_files)})")
+    
+    def _rename_file(self, old_path, new_path):
+        """Update file path when a file is renamed."""
+        if old_path in self.folder_capture.image_files:
+            index = self.folder_capture.image_files.index(old_path)
+            self.folder_capture.image_files[index] = new_path
+            
+            # Re-sort if necessary
+            if self.folder_capture.sort_by == 'date':
+                self.folder_capture.image_files.sort(key=lambda x: os.path.getctime(x) if os.path.exists(x) else 0)
+            else:
+                self.folder_capture.image_files.sort()
+            
+            logger.info(f"Renamed file in list: {old_path} -> {new_path}")
 
 
 class FolderCapture(VideoCaptureBase):
@@ -119,8 +155,6 @@ class FolderCapture(VideoCaptureBase):
         self._folder_observer = None
         self._folder_handler = None
         self._refresh_lock = None
-        self._monitor_thread = None
-        self._monitor_stop_event = None
         self._last_file_count = 0
         
         if not WATCHDOG_AVAILABLE and watch_folder:
@@ -160,65 +194,13 @@ class FolderCapture(VideoCaptureBase):
                 self._folder_observer.schedule(watchdog_handler, self.source, recursive=False)
                 self._folder_observer.start()
                 
-                # Start background monitoring thread for additional resilience
-                self._start_background_monitor()
-                
                 logger.info(f"Started folder watching for: {self.source}")
         except Exception as e:
             logger.error(f"Failed to start folder watching: {e}")
             self._folder_observer = None
     
-    def _start_background_monitor(self):
-        """Start a background thread that periodically checks for file changes."""
-        if self._monitor_thread and self._monitor_thread.is_alive():
-            return
-        
-        import threading
-        self._monitor_stop_event = threading.Event()
-        self._last_file_count = len(self.image_files)
-        
-        def monitor_loop():
-            while not self._monitor_stop_event.is_set():
-                try:
-                    # Check every 2 seconds for file count changes
-                    self._monitor_stop_event.wait(2.0)
-                    if self._monitor_stop_event.is_set():
-                        break
-                    
-                    # Quick check: count files in directory
-                    if os.path.isdir(self.source):
-                        valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
-                        current_files = [f for f in os.listdir(self.source) 
-                                       if f.lower().endswith(valid_exts)]
-                        current_count = len(current_files)
-                        
-                        if current_count != self._last_file_count:
-                            logger.info(f"Background monitor detected file count change: {self._last_file_count} -> {current_count}")
-                            self._last_file_count = current_count
-                            # Trigger refresh
-                            threading.Thread(target=self._refresh_file_list_async, daemon=True).start()
-                            
-                except Exception as e:
-                    logger.warning(f"Background monitor error: {e}")
-        
-        self._monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
-        self._monitor_thread.start()
-        logger.info("Started background file monitor")
-    
-    def _stop_background_monitor(self):
-        """Stop the background monitoring thread."""
-        if self._monitor_stop_event:
-            self._monitor_stop_event.set()
-        if self._monitor_thread:
-            self._monitor_thread.join(timeout=1)
-        self._monitor_thread = None
-        self._monitor_stop_event = None
-    
     def _stop_folder_watching(self):
         """Stop monitoring the folder for file changes."""
-        # Stop background monitor first
-        self._stop_background_monitor()
-        
         if self._folder_observer:
             try:
                 self._folder_observer.stop()
