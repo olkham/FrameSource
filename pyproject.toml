@@ -17,7 +17,8 @@ dependencies = [
     "opencv-python",
     "numpy",
     "mss",
-    "numba"
+    "numba",
+    "watchdog"
 ]
 
 [project.optional-dependencies]
