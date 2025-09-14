@@ -2,8 +2,13 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import cv2
 import logging
-from .video_capture_base import VideoCaptureBase
 import platform
+
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    # If running as main script, try absolute import
+    from video_capture_base import VideoCaptureBase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -223,7 +228,7 @@ if __name__ == "__main__":
     # Example usage
     camera = WebcamCapture(source=0)
     if camera.connect():
-        camera.start_async()
+        # camera.start_async()
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
@@ -236,6 +241,8 @@ if __name__ == "__main__":
                 cv2.imshow("Webcam", frame) # type: ignore
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
+            else:
+                print("Failed to read frame from webcam.")
 
         camera.stop()
         camera.disconnect()
