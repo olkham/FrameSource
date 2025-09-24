@@ -378,7 +378,8 @@ class RealsenseCapture(VideoCaptureBase):
             ret = []
             if len(devices) > 0:
                 for dev in devices:
-                    ret.append({"serial":dev.get_info(rs.camera_info.serial_number), "name":dev.get_info(rs.camera_info.name)})
+                    serial = dev.get_info(rs.camera_info.serial_number)
+                    ret.append({"id":serial, "serial":serial, "name":dev.get_info(rs.camera_info.name)})
 
         except ImportError:
             logger.warning("pyrealsense2 module not available. Install pyrealsense2 to list available realsense cameras.")

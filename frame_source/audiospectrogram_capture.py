@@ -702,7 +702,7 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             for i in range(p.get_device_count()):
                 dev = p.get_device_info_by_index(i)
                 if dev["maxInputChannels"] > 0:
-                    devices.append({"index":i, "name":dev['name'], "backend_name":"pyaudio"})
+                    devices.append({"id": i, "index":i, "name":dev['name'], "backend_name":"pyaudio"})
 
             p.terminate()
             return devices

@@ -328,7 +328,7 @@ class BaslerCapture(VideoCaptureBase):
 
             ret = []
             for i, dev in enumerate(devices):
-                ret.append({"index":i, "name":dev.GetFriendlyName(), "serial": dev.GetSerialNumber(), "model":dev.GetModelName()})
+                ret.append({"id": dev.GetSerialNumber(), "index":i, "name":dev.GetFriendlyName(), "serial": dev.GetSerialNumber(), "model":dev.GetModelName()})
             return ret
         except ImportError:
             logger.warning("pypylon module not available. Install pypylon package to list Basler cameras.")

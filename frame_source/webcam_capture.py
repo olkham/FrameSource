@@ -79,7 +79,7 @@ class WebcamCapture(VideoCaptureBase):
             from cv2.videoio_registry import getBackendName
 
             for camera_info in enumerate_cameras():
-                devices.append({"index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+                devices.append({"id": f"{camera_info.backend}/{camera_info.index}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
             return devices
         except ImportError:
             logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
@@ -105,7 +105,19 @@ class WebcamCapture(VideoCaptureBase):
     def connect(self) -> bool:
         """Connect to webcam."""
         try:
-            self.cap = cv2.VideoCapture(self.source, self.api_preference)
+            src = self.source
+            api_pref = self.api_preference
+            # Support `api_pref/index` format or `api_pref/path` format used in list_devices `id` field
+            if isinstance(src, str) and "/" in src:
+                api_pref, src = src.split("/")
+
+                if api_pref.isdigit():
+                    api_pref = int(api_pref)
+
+                if src.isdigit():
+                    src = int(src)
+
+            self.cap = cv2.VideoCapture(src, api_pref)
             if not self.cap.isOpened():
                 logger.error(f"Failed to open webcam {self.source}")
                 return False
