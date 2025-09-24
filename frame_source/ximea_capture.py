@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict
 import numpy as np
 import logging
 from .video_capture_base import VideoCaptureBase
@@ -272,6 +272,11 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting Ximea camera resolution: {e}")
             return False
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        # Todo
+        return []
 
 if __name__ == "__main__":
     # Example usage

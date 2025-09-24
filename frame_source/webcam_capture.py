@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict, List
 import numpy as np
 import cv2
 import logging
@@ -70,7 +70,22 @@ class WebcamCapture(VideoCaptureBase):
         return ret, frame if ret else None
 
     """Webcam capture using OpenCV."""
-    
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            devices = []
+            from cv2_enumerate_cameras import enumerate_cameras
+            from cv2.videoio_registry import getBackendName
+
+            for camera_info in enumerate_cameras():
+                devices.append({"id": f"{camera_info.backend}/{camera_info.index}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+            return devices
+        except ImportError:
+            logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
+        return []
+
+
     def __init__(self, source: int = 0, **kwargs):
         super().__init__(source, **kwargs)
         self.cap = None
@@ -90,7 +105,19 @@ class WebcamCapture(VideoCaptureBase):
     def connect(self) -> bool:
         """Connect to webcam."""
         try:
-            self.cap = cv2.VideoCapture(self.source, self.api_preference)
+            src = self.source
+            api_pref = self.api_preference
+            # Support `api_pref/index` format or `api_pref/path` format used in list_devices `id` field
+            if isinstance(src, str) and "/" in src:
+                api_pref, src = src.split("/")
+
+                if api_pref.isdigit():
+                    api_pref = int(api_pref)
+
+                if src.isdigit():
+                    src = int(src)
+
+            self.cap = cv2.VideoCapture(src, api_pref)
             if not self.cap.isOpened():
                 logger.error(f"Failed to open webcam {self.source}")
                 return False

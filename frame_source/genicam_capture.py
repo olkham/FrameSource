@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Tuple, Any
+import os
+from typing import Optional, Tuple, Any, List, Dict
 
 import numpy as np
 
@@ -195,6 +196,9 @@ class GenicamCapture(VideoCaptureBase):
             cti_files = self.config.get("cti_files",[])
             for cti_file in cti_files:
                 self.h.add_file(cti_file)
+            for file in GenicamCapture.find_cti_paths():
+                self.h.add_file(file)
+
             self.h.update()
 
             devices = self.h.device_info_list
@@ -439,6 +443,35 @@ class GenicamCapture(VideoCaptureBase):
         except Exception:
             return None
 
+    @staticmethod
+    def find_cti_paths():
+        res = []
+        cti_paths = os.getenv("GENICAM_GENTL64_PATH")
+        if cti_paths and len(cti_paths) > 0:
+            files = os.listdir(cti_paths)
+            for f in files:
+                if f.endswith(".cti"):
+                    res.append(os.path.join(cti_paths, f))
+        return res
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            from harvesters.core import Harvester
+            h = Harvester()
+            for file in GenicamCapture.find_cti_paths():
+                h.add_file(file)
+            h.update()
+
+            devices = []
+            for i, info in enumerate(h.device_info_list):
+                devices.append({"id": info.serial_number, "index":i, "name":f"{info.vendor} {info.model}", "serial":info.serial_number, "model":info.model,})
+
+            h.reset()
+            return devices
+        except ImportError:
+            logger.warning("harvesters module not available. Install harvesters to list available genicam cameras.")
+        return []
 
 if __name__ == "__main__":
     # Example usage

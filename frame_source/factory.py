@@ -14,7 +14,7 @@ Usage:
     frame = capture.read()
 """
 
-from typing import Any
+from typing import Any, Dict, List
 import logging
 
 from .genicam_capture import GenicamCapture
@@ -95,7 +95,16 @@ class FrameSourceFactory:
 
         cls._capture_types[name] = capture_class
         logger.info(f"Registered new capture type: {name}")
-    
+
+    @classmethod
+    def enumerate_devices(cls) -> Dict:
+        devices = {}
+        for k, v in cls._capture_types.items():
+            ret = v.list_devices()
+            if ret:
+                devices[k] = ret
+        return devices
+
     @classmethod
     def get_available_types(cls) -> list:
         """Get list of available capture types."""

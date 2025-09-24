@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
 import numpy as np
 import logging
 import platform
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class HuatengCapture(VideoCaptureBase):
     """Huateng camera capture using mvsdk."""
-    
+
     def __init__(self, source: Any = None, **kwargs):
         super().__init__(source, **kwargs)
         self.hCamera = -1
@@ -177,6 +177,11 @@ class HuatengCapture(VideoCaptureBase):
     def set_fps(self, fps: float) -> bool:
         # Not directly supported in mvsdk, return False
         return False
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        # Todo
+        return []
 
 if __name__ == "__main__":
     # Example usage

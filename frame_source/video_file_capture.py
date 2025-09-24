@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
 import numpy as np
 import cv2
 import logging
@@ -169,6 +169,9 @@ class VideoFileCapture(VideoCaptureBase):
         logger.warning("Setting resolution is not applicable for video files")
         return False
 
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        return []
 
 if __name__ == "__main__":
     # Example usage
