@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
 import numpy as np
 import cv2
 import logging
@@ -367,6 +367,22 @@ class RealsenseCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting auto exposure: {e}")
             return False
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            import pyrealsense2 as rs
+            ctx = rs.context()
+            devices = ctx.query_devices()
+
+            ret = []
+            if len(devices) > 0:
+                for dev in devices:
+                    ret.append({"serial":dev.get_info(rs.camera_info.serial_number), "name":dev.get_info(rs.camera_info.name)})
+
+        except ImportError:
+            logger.warning("pyrealsense2 module not available. Install pyrealsense2 to list available realsense cameras.")
+        return []
 
 
 if __name__ == "__main__":

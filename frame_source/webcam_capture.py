@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict, List
 import numpy as np
 import cv2
 import logging
@@ -70,7 +70,22 @@ class WebcamCapture(VideoCaptureBase):
         return ret, frame if ret else None
 
     """Webcam capture using OpenCV."""
-    
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            devices = []
+            from cv2_enumerate_cameras import enumerate_cameras
+            from cv2.videoio_registry import getBackendName
+
+            for camera_info in enumerate_cameras():
+                devices.append({"index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+            return devices
+        except ImportError:
+            logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
+        return []
+
+
     def __init__(self, source: int = 0, **kwargs):
         super().__init__(source, **kwargs)
         self.cap = None

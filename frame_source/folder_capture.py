@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import time
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 import threading
 
 # Handle both relative imports (when used as module) and absolute imports (when run standalone)
@@ -676,6 +676,10 @@ class FolderCapture(VideoCaptureBase):
         """
         self._refresh_file_list()
         return len(self.image_files)
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        return []
 
 # Standalone test code
 if __name__ == "__main__":

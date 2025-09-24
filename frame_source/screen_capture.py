@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import time
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
 from .video_capture_base import VideoCaptureBase
 import logging
 import threading
@@ -160,6 +160,10 @@ class ScreenCapture(VideoCaptureBase):
     def set_fps(self, fps: float) -> bool:
         self.fps = fps
         return True
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        return []
 
 
 if __name__ == "__main__":

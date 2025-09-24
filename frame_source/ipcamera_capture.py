@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
 import numpy as np
 import cv2
 import logging
@@ -63,7 +63,7 @@ class IPCameraCapture(VideoCaptureBase):
         return ret, frame if ret else None
 
     """IP Camera capture using OpenCV with RTSP/HTTP streams."""
-    
+
     def __init__(self, source: str, username: Optional[str] = None, password: Optional[str] = None, **kwargs):
         super().__init__(source, **kwargs)
         self.username = username
@@ -158,6 +158,10 @@ class IPCameraCapture(VideoCaptureBase):
         result2 = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         logger.info(f"Set IP camera resolution to {width}x{height} (success: {result1 and result2})")
         return result1 and result2
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        return []
 
 
 if __name__ == "__main__":

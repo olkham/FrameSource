@@ -1,6 +1,7 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
+
 
 class VideoCaptureBase(ABC):
     def start_async(self):
@@ -254,3 +255,9 @@ class VideoCaptureBase(ABC):
                 frame = processor.process(frame)
         
         return ret, frame
+
+    @staticmethod
+    @abstractmethod
+    def list_devices() -> List[Dict]:
+        """Enumerate all devices available for the driver"""
+        pass

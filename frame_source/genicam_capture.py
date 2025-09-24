@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Tuple, Any
+import os
+from typing import Optional, Tuple, Any, List, Dict
 
 import numpy as np
 
@@ -439,6 +440,30 @@ class GenicamCapture(VideoCaptureBase):
         except Exception:
             return None
 
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            from harvesters.core import Harvester
+            h = Harvester()
+
+            cti_paths = os.getenv("GENICAM_GENTL64_PATH")
+            if cti_paths and len(cti_paths) > 0:
+                files = os.listdir(cti_paths)
+                for f in files:
+                    if f.endswith(".cti"):
+                        h.add_file(os.path.join(cti_paths, f))
+
+            h.update()
+
+            devices = []
+            for i, info in enumerate(h.device_info_list):
+                devices.append({"index":i, "name":f"{info.vendor} {info.model}", "serial":info.serial_number, "model":info.model,})
+
+            h.reset()
+            return devices
+        except ImportError:
+            logger.warning("harvesters module not available. Install harvesters to list available genicam cameras.")
+        return []
 
 if __name__ == "__main__":
     # Example usage

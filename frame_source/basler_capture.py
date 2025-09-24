@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List, Dict
 import numpy as np
 import logging
 from .video_capture_base import VideoCaptureBase
@@ -75,7 +75,7 @@ class BaslerCapture(VideoCaptureBase):
             return False, None
 
     """Basler camera capture using pypylon."""
-    
+
     def __init__(self, source: Any = None, **kwargs):
         super().__init__(source, **kwargs)
         self.camera = None
@@ -316,6 +316,24 @@ class BaslerCapture(VideoCaptureBase):
             return self.camera.AcquisitionFrameRate.GetValue()
         except Exception:
             return None
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            from pypylon import pylon
+
+            # Create an instant camera array
+            tlf = pylon.TlFactory.GetInstance()
+            devices = tlf.EnumerateDevices()
+
+            ret = []
+            for i, dev in enumerate(devices):
+                ret.append({"index":i, "name":dev.GetFriendlyName(), "serial": dev.GetSerialNumber(), "model":dev.GetModelName()})
+            return ret
+        except ImportError:
+            logger.warning("pypylon module not available. Install pypylon package to list Basler cameras.")
+        return []
+
 
 
 if __name__ == "__main__":

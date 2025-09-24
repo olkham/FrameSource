@@ -3,7 +3,7 @@ import cv2
 import threading
 import time
 import logging
-from typing import Optional, Tuple, Any, Union
+from typing import Optional, Tuple, Any, Union, List, Dict
 from pathlib import Path
 
 try:
@@ -25,7 +25,6 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     Capture audio spectrograms as video frames from microphones or audio files.
     Treats spectrograms as visual data that can be processed like regular video frames.
     """
-    
     def __init__(self, source: Union[int, str, None] = None, **kwargs):
         """
         Initialize audio spectrogram capture.
@@ -691,3 +690,23 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         # Normalize
         normalized = (mel_db - low_percentile) / range_val
         return np.clip(normalized, 0, 1)
+
+    @staticmethod
+    def list_devices() -> List[Dict]:
+        try:
+            import pyaudio
+            p = pyaudio.PyAudio()
+
+            devices = []
+
+            for i in range(p.get_device_count()):
+                dev = p.get_device_info_by_index(i)
+                if dev["maxInputChannels"] > 0:
+                    devices.append({"index":i, "name":dev['name'], "backend_name":"pyaudio"})
+
+            p.terminate()
+            return devices
+        except ImportError:
+            logger.warning("pyaudio module not available. Install pyaudio package to list available audio devices.")
+        return []
+
