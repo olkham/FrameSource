@@ -2,9 +2,14 @@ import numpy as np
 import cv2
 import time
 from typing import Optional, Tuple, Any
-from .video_capture_base import VideoCaptureBase
 import logging
 import threading
+
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    # If running as main script, try absolute import
+    from video_capture_base import VideoCaptureBase
 
 try:
     import mss
@@ -12,6 +17,8 @@ except ImportError:
     mss = None
     logging.warning("mss is not installed. Install it with 'pip install mss' to use ScreenCapture.")
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ScreenCapture(VideoCaptureBase):
@@ -161,9 +168,52 @@ class ScreenCapture(VideoCaptureBase):
         self.fps = fps
         return True
 
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available screen capture sources (monitors/displays).
+        
+        Returns:
+            list: List of dictionaries containing screen information.
+                Each dict contains: {'index': int, 'name': str, 'width': int, 'height': int, 'left': int, 'top': int}
+        """
+        devices = []
+        
+        if mss is None:
+            logger.warning("mss module not available. Cannot discover screen sources.")
+            return []
+        
+        try:
+            with mss.mss() as sct:
+                # Get all monitors (index 0 is typically all monitors combined)
+                monitors = sct.monitors
+                
+                for i, monitor in enumerate(monitors):
+                    device_data = {
+                        'index': i,
+                        'name': f"Monitor {i}" if i > 0 else "All Monitors",
+                        'width': monitor['width'],
+                        'height': monitor['height'],
+                        'left': monitor['left'],
+                        'top': monitor['top']
+                    }
+                    devices.append(device_data)
+                    logger.info(f"Found screen source: {device_data}")
+                    
+        except Exception as e:
+            logger.error(f"Error discovering screen sources: {e}")
+        
+        return devices
+
 
 if __name__ == "__main__":
     # Example usage
+    
+    screens = ScreenCapture.discover()
+    print("Discovered screen sources:")
+    for screen in screens:
+        print(f" - {screen['name']} (#{screen['index']}): {screen['width']}x{screen['height']}")
+
     camera = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
     if camera.connect():
         camera.start_async()

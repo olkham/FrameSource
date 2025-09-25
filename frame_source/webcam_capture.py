@@ -223,9 +223,198 @@ class WebcamCapture(VideoCaptureBase):
             logger.error(f"Error setting auto exposure: {e}")
             return False
 
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available webcam devices with real device names.
+        
+        Returns:
+            list: List of dictionaries containing webcam device information.
+                Each dict contains: {'index': int, 'name': str, 'backend': str}
+        """
+        devices = []
+        
+        # Get device names using platform-specific methods
+        device_names = cls._get_camera_names()
+        
+        # Try different backends for better device detection
+        if platform.system() == "Windows":
+            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF]
+        elif platform.system() == "Darwin":  # macOS
+            backends = [cv2.CAP_AVFOUNDATION]
+        else:  # Linux
+            backends = [cv2.CAP_V4L2]
+        
+        for backend in backends:
+            backend_name = {
+                cv2.CAP_DSHOW: "DirectShow",
+                cv2.CAP_MSMF: "Media Foundation", 
+                cv2.CAP_AVFOUNDATION: "AVFoundation",
+                cv2.CAP_V4L2: "Video4Linux2"
+            }.get(backend, f"Backend_{backend}")
+            
+            # Test indices 0-9 (most systems won't have more than 10 cameras)
+            for i in range(10):
+                cap = cv2.VideoCapture(i, backend)
+                if cap.isOpened():
+                    # Try to read a frame to verify the camera actually works
+                    ret, _ = cap.read()
+                    if ret:
+                        # Get device name from platform-specific detection or fallback
+                        name = device_names.get(i, f"Camera {i}")
+                        
+                        device_info = {
+                            'index': i,
+                            'name': name,
+                            'backend': backend_name
+                        }
+                        
+                        # Avoid duplicates (same device detected by multiple backends)
+                        if not any(d['index'] == i for d in devices):
+                            devices.append(device_info)
+                            logger.info(f"Found webcam: {device_info}")
+                    
+                    cap.release()
+                else:
+                    # If we can't open this index, higher indices likely won't work either
+                    break
+        
+        return devices
+
+    @classmethod
+    def _get_camera_names(cls) -> dict:
+        """
+        Get camera names using platform-specific methods.
+        
+        Returns:
+            dict: Mapping of camera index to camera name
+        """
+        names = {}
+        
+        if platform.system() == "Windows":
+            names = cls._get_windows_camera_names()
+        elif platform.system() == "Darwin":  # macOS
+            names = cls._get_macos_camera_names()
+        else:  # Linux
+            names = cls._get_linux_camera_names()
+            
+        return names
+
+    @classmethod
+    def _get_windows_camera_names(cls) -> dict:
+        """Get camera names on Windows using WMI or PowerShell."""
+        names = {}
+        
+        try:
+            # Try using WMI first (requires pywin32)
+            try:
+                import win32com.client
+                wmi = win32com.client.GetObject("winmgmts:")
+                cameras = wmi.InstancesOf("Win32_PnPEntity")
+                
+                camera_index = 0
+                for camera in cameras:
+                    if camera.Name and any(keyword in camera.Name.lower() for keyword in 
+                                         ['camera', 'webcam', 'video', 'usb video', 'integrated camera']):
+                        names[camera_index] = camera.Name
+                        camera_index += 1
+                        
+            except ImportError:
+                # Fallback to PowerShell if pywin32 is not available
+                import subprocess
+                try:
+                    # Use PowerShell to get camera devices
+                    cmd = [
+                        'powershell', '-Command',
+                        "Get-PnpDevice -Class Camera | Select-Object -ExpandProperty FriendlyName"
+                    ]
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    
+                    if result.returncode == 0:
+                        camera_names = [name.strip() for name in result.stdout.strip().split('\n') if name.strip()]
+                        for i, name in enumerate(camera_names):
+                            names[i] = name
+                            
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
+                    logger.warning("Could not get camera names via PowerShell")
+                    
+        except Exception as e:
+            logger.warning(f"Could not get Windows camera names: {e}")
+            
+        return names
+
+    @classmethod 
+    def _get_macos_camera_names(cls) -> dict:
+        """Get camera names on macOS using system_profiler."""
+        names = {}
+        
+        try:
+            import subprocess
+            # Use system_profiler to get camera information
+            cmd = ['system_profiler', 'SPCameraDataType', '-json']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                import json
+                data = json.loads(result.stdout)
+                cameras = data.get('SPCameraDataType', [])
+                
+                for i, camera in enumerate(cameras):
+                    camera_name = camera.get('_name', f'Camera {i}')
+                    names[i] = camera_name
+                    
+        except Exception as e:
+            logger.warning(f"Could not get macOS camera names: {e}")
+            
+        return names
+
+    @classmethod
+    def _get_linux_camera_names(cls) -> dict:
+        """Get camera names on Linux using /sys/class/video4linux."""
+        names = {}
+        
+        try:
+            import os
+            import glob
+            
+            # Look for video devices in /sys/class/video4linux/
+            video_devices = glob.glob('/sys/class/video4linux/video*')
+            video_devices.sort()  # Sort to maintain consistent ordering
+            
+            for device_path in video_devices:
+                try:
+                    # Extract device number (e.g., video0 -> 0)
+                    device_name = os.path.basename(device_path)
+                    if device_name.startswith('video'):
+                        device_num = int(device_name[5:])
+                        
+                        # Try to read the device name from the name file
+                        name_file = os.path.join(device_path, 'name')
+                        if os.path.exists(name_file):
+                            with open(name_file, 'r') as f:
+                                camera_name = f.read().strip()
+                                if camera_name:
+                                    names[device_num] = camera_name
+                                    
+                except (ValueError, IOError, OSError):
+                    continue
+                    
+        except Exception as e:
+            logger.warning(f"Could not get Linux camera names: {e}")
+            
+        return names
+
 
 if __name__ == "__main__":
     # Example usage
+    
+    print("Discovering webcams...")
+    webcams = WebcamCapture.discover()
+    print(f"Found {len(webcams)} webcams.")
+    for cam in webcams:
+        print(f"Index: {cam['index']}, Name: {cam['name']}, Backend: {cam['backend']}")
+        
+        
     camera = WebcamCapture(source=0)
     if camera.connect():
         # camera.start_async()

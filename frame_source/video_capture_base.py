@@ -178,6 +178,25 @@ class VideoCaptureBase(ABC):
         """
         pass
     
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available devices for this capture type.
+        
+        Returns:
+            list: List of available devices. Format depends on implementation:
+                - For cameras: List of device indices, serial numbers, or device info dicts
+                - For audio: List of microphone devices with info
+                - For network cameras: List of discovered IP cameras
+                - For files: Empty list (no discovery needed)
+        
+        Note:
+            This is a class method that can be called without instantiating the capture class.
+            Subclasses should override this method to implement device-specific discovery.
+            Default implementation returns empty list.
+        """
+        return []
+    
     def get_frame_size(self) -> Optional[Tuple[int, int]]:
         """
         Get frame dimensions (width, height).

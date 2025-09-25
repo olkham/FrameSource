@@ -15,8 +15,14 @@ except ImportError as e:
     AUDIO_AVAILABLE = False
     MISSING_DEPS = str(e)
 
-from .video_capture_base import VideoCaptureBase
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    # If running as main script, try absolute import
+    from video_capture_base import VideoCaptureBase
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -691,3 +697,65 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         # Normalize
         normalized = (mel_db - low_percentile) / range_val
         return np.clip(normalized, 0, 1)
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available audio input devices (microphones).
+        
+        Returns:
+            list: List of dictionaries containing audio device information.
+                Each dict contains: {'index': int, 'name': str, 'channels': int, 'sample_rate': float}
+        """
+        if not AUDIO_AVAILABLE:
+            logger.warning("Audio dependencies not available. Cannot discover audio devices.")
+            return []
+        
+        devices = []
+        
+        try:
+            p = pyaudio.PyAudio()
+            
+            # Get device count
+            device_count = p.get_device_count()
+            
+            for i in range(device_count):
+                try:
+                    device_info = p.get_device_info_by_index(i)
+                    
+                    # Only include input devices (microphones)
+                    max_input_channels = device_info.get('maxInputChannels', 0)
+                    if isinstance(max_input_channels, (int, float)) and max_input_channels > 0:
+                        device_data = {
+                            'index': i,
+                            'name': device_info['name'],
+                            'channels': device_info['maxInputChannels'],
+                            'sample_rate': device_info['defaultSampleRate']
+                        }
+                        devices.append(device_data)
+                        logger.info(f"Found audio input device: {device_data}")
+                        
+                except Exception as e:
+                    logger.warning(f"Could not get info for audio device {i}: {e}")
+                    continue
+            
+            p.terminate()
+            
+        except Exception as e:
+            logger.error(f"Error discovering audio devices: {e}")
+        
+        return devices
+
+
+if __name__ == "__main__":
+    import queue
+    import threading
+    import time
+    import cv2
+
+    # Example usage: Capture spectrograms from multiple audio sources (microphones or files)
+    
+    devices = AudioSpectrogramCapture.discover()
+    print(f"Discovered {len(devices)} audio input devices:")
+    for device in devices:
+       print(f" - {device['name']} (Index: {device['index']}, Channels: {device['channels']}, Sample Rate: {device['sample_rate']})")

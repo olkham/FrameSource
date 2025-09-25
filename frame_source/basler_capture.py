@@ -1,7 +1,12 @@
 from typing import Optional, Tuple, Any
 import numpy as np
 import logging
-from .video_capture_base import VideoCaptureBase
+
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    # If running as main script, try absolute import
+    from video_capture_base import VideoCaptureBase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -316,6 +321,50 @@ class BaslerCapture(VideoCaptureBase):
             return self.camera.AcquisitionFrameRate.GetValue()
         except Exception:
             return None
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available Basler cameras.
+        
+        Returns:
+            list: List of dictionaries containing Basler camera information.
+                Each dict contains: {'index': int, 'serial_number': str, 'model_name': str, 'device_class': str}
+        """
+        devices = []
+        
+        try:
+            from pypylon import pylon
+        except ImportError:
+            logger.warning("pypylon module not available. Cannot discover Basler cameras.")
+            return []
+        
+        try:
+            # Get the transport layer factory
+            tlFactory = pylon.TlFactory.GetInstance()
+            
+            # Get all attached devices
+            device_list = tlFactory.EnumerateDevices()
+            
+            for index, device_info in enumerate(device_list):
+                try:
+                    device_data = {
+                        'index': index,
+                        'serial_number': device_info.GetSerialNumber(),
+                        'model_name': device_info.GetModelName(),
+                        'device_class': device_info.GetDeviceClass()
+                    }
+                    devices.append(device_data)
+                    logger.info(f"Found Basler camera: {device_data}")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not get info for Basler device {index}: {e}")
+                    continue
+            
+        except Exception as e:
+            logger.error(f"Error discovering Basler cameras: {e}")
+        
+        return devices
 
 
 if __name__ == "__main__":

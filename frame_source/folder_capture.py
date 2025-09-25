@@ -677,6 +677,19 @@ class FolderCapture(VideoCaptureBase):
         self._refresh_file_list()
         return len(self.image_files)
 
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover method for folder capture sources.
+        
+        Returns:
+            list: Empty list, as discovery is not applicable for folder-based sources.
+                Use this class directly with folder paths as the source parameter.
+        """
+        # Folder capture doesn't discover devices - it works with folder paths
+        logger.info("FolderCapture uses folder paths as sources, not discoverable devices.")
+        return []
+
 # Standalone test code
 if __name__ == "__main__":
     import sys

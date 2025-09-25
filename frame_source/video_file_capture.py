@@ -2,7 +2,10 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import cv2
 import logging
-from .video_capture_base import VideoCaptureBase
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    from video_capture_base import VideoCaptureBase
 import time
 
 # Configure logging
@@ -168,6 +171,19 @@ class VideoFileCapture(VideoCaptureBase):
         """Set frame size (not applicable for video files)."""
         logger.warning("Setting resolution is not applicable for video files")
         return False
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover method for video file capture.
+        
+        Returns:
+            list: Empty list, as discovery is not applicable for file-based sources.
+                Use this class directly with file paths as the source parameter.
+        """
+        # Video file capture doesn't discover devices - it works with file paths
+        logger.info("VideoFileCapture uses file paths as sources, not discoverable devices.")
+        return []
 
 
 if __name__ == "__main__":

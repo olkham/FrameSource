@@ -2,8 +2,13 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import cv2
 import logging
-from .video_capture_base import VideoCaptureBase
 import platform
+
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    # If running as main script, try absolute import
+    from video_capture_base import VideoCaptureBase
 from frame_processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
 
 # Configure logging
@@ -367,6 +372,51 @@ class RealsenseCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting auto exposure: {e}")
             return False
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available RealSense cameras.
+        
+        Returns:
+            list: List of dictionaries containing RealSense camera information.
+                Each dict contains: {'index': int, 'serial_number': str, 'name': str, 'product_line': str}
+        """
+        devices = []
+        
+        try:
+            import pyrealsense2 as rs
+        except ImportError:
+            logger.warning("pyrealsense2 module not available. Cannot discover RealSense cameras.")
+            return []
+        
+        try:
+            # Get RealSense context
+            ctx = rs.context()
+            
+            # Query all connected devices
+            device_list = ctx.query_devices()
+            
+            for index in range(len(device_list)):
+                try:
+                    device = device_list[index]
+                    device_data = {
+                        'index': index,
+                        'serial_number': device.get_info(rs.camera_info.serial_number),
+                        'name': device.get_info(rs.camera_info.name),
+                        'product_line': device.get_info(rs.camera_info.product_line)
+                    }
+                    devices.append(device_data)
+                    logger.info(f"Found RealSense camera: {device_data}")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not get info for RealSense device {index}: {e}")
+                    continue
+            
+        except Exception as e:
+            logger.error(f"Error discovering RealSense cameras: {e}")
+        
+        return devices
 
 
 if __name__ == "__main__":

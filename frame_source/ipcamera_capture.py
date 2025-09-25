@@ -2,7 +2,10 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import cv2
 import logging
-from .video_capture_base import VideoCaptureBase
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    from video_capture_base import VideoCaptureBase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -158,6 +161,19 @@ class IPCameraCapture(VideoCaptureBase):
         result2 = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         logger.info(f"Set IP camera resolution to {width}x{height} (success: {result1 and result2})")
         return result1 and result2
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover method for IP camera capture.
+        
+        Returns:
+            list: Empty list, as IP cameras require manual configuration with URLs/credentials.
+                Use this class directly with RTSP/HTTP URLs as the source parameter.
+        """
+        # IP cameras require manual configuration - cannot be auto-discovered easily
+        logger.info("IPCameraCapture requires manual configuration with URLs and credentials.")
+        return []
 
 
 if __name__ == "__main__":

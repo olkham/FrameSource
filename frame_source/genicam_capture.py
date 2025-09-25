@@ -3,7 +3,10 @@ from typing import Optional, Tuple, Any
 
 import numpy as np
 
-from .video_capture_base import VideoCaptureBase
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    from video_capture_base import VideoCaptureBase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -439,10 +442,72 @@ class GenicamCapture(VideoCaptureBase):
         except Exception:
             return None
 
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available GenICam compliant cameras.
+        
+        Returns:
+            list: List of dictionaries containing GenICam camera information.
+                Each dict contains: {'index': int, 'serial_number': str, 'model_name': str, 'vendor': str}
+        """
+        devices = []
+        
+        try:
+            from harvesters.core import Harvester
+        except ImportError:
+            logger.warning("Harvesters module not available. Cannot discover GenICam cameras.")
+            return []
+        
+        harvester = None
+        try:
+            harvester = Harvester()
+            
+            # Add common GenTL producer paths (this may need customization)
+            try:
+                # Try to add some common GenTL producers
+                harvester.add_cti_file('/opt/pylon5/lib64/pylon_TL_GenICam.cti')  # Basler
+                harvester.add_cti_file('/opt/mvIMPACT_acquire/lib/x86_64/mvGenTLProducer.cti')  # MATRIX VISION
+            except:
+                pass  # If paths don't exist, that's fine
+            
+            harvester.update()
+            
+            for i, device_info in enumerate(harvester.device_info_list):
+                try:
+                    device_data = {
+                        'index': i,
+                        'serial_number': getattr(device_info, 'serial_number', f'genicam_{i}'),
+                        'model_name': getattr(device_info, 'model', 'GenICam Camera'),
+                        'vendor': getattr(device_info, 'vendor', 'Unknown')
+                    }
+                    devices.append(device_data)
+                    logger.info(f"Found GenICam camera: {device_data}")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not get info for GenICam device {i}: {e}")
+                    continue
+            
+        except Exception as e:
+            logger.error(f"Error discovering GenICam cameras: {e}")
+        finally:
+            if harvester:
+                try:
+                    harvester.reset()
+                except:
+                    pass
+        
+        return devices
+
 
 if __name__ == "__main__":
     # Example usage
     import cv2
+    
+    devices = GenicamCapture.discover()
+    print("Discovered GenICam cameras:")
+    for device in devices:
+        print(f"  - {device['model_name']} (Serial: {device['serial_number']})")
 
     camera = GenicamCapture()  # Replace with actual serial number or index
     if camera.connect():

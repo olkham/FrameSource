@@ -2,7 +2,11 @@ from typing import Optional, Tuple, Any
 import numpy as np
 import logging
 import platform
-from video_capture_base import VideoCaptureBase
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    # If running as main script, try absolute import
+    from video_capture_base import VideoCaptureBase
 import mvsdk as mvsdk
 
 # Configure logging
@@ -177,6 +181,53 @@ class HuatengCapture(VideoCaptureBase):
     def set_fps(self, fps: float) -> bool:
         # Not directly supported in mvsdk, return False
         return False
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available Huateng cameras.
+        
+        Returns:
+            list: List of dictionaries containing Huateng camera information.
+                Each dict contains: {'index': int, 'serial_number': str, 'model_name': str, 'device_type': str}
+        """
+        devices = []
+        
+        try:
+            # Enumerate Huateng cameras using mvsdk
+            dev_list = mvsdk.CameraEnumerateDevice()
+            
+            for i, device_info in enumerate(dev_list):
+                try:
+                    # Extract device info safely
+                    serial_number = f'huateng_{i}'
+                    model_name = 'Huateng Camera'
+                    
+                    if hasattr(device_info, 'acSn'):
+                        sn = getattr(device_info, 'acSn')
+                        serial_number = sn.decode('utf-8') if isinstance(sn, bytes) else str(sn)
+                    
+                    if hasattr(device_info, 'acProductName'):
+                        pn = getattr(device_info, 'acProductName')
+                        model_name = pn.decode('utf-8') if isinstance(pn, bytes) else str(pn)
+                    
+                    device_data = {
+                        'index': i,
+                        'serial_number': serial_number,
+                        'model_name': model_name,
+                        'device_type': 'Huateng'
+                    }
+                    devices.append(device_data)
+                    logger.info(f"Found Huateng camera: {device_data}")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not get info for Huateng device {i}: {e}")
+                    continue
+            
+        except Exception as e:
+            logger.error(f"Error discovering Huateng cameras: {e}")
+        
+        return devices
 
 if __name__ == "__main__":
     # Example usage

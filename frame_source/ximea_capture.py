@@ -1,7 +1,10 @@
 from typing import Optional, Tuple
 import numpy as np
 import logging
-from .video_capture_base import VideoCaptureBase
+try:
+    from .video_capture_base import VideoCaptureBase
+except ImportError:
+    from video_capture_base import VideoCaptureBase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -272,6 +275,54 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting Ximea camera resolution: {e}")
             return False
+
+    @classmethod
+    def discover(cls) -> list:
+        """
+        Discover available Ximea cameras.
+        
+        Returns:
+            list: List of dictionaries containing Ximea camera information.
+                Each dict contains: {'index': int, 'serial_number': str, 'device_name': str, 'device_type': str}
+        """
+        devices = []
+        
+        try:
+            from ximea import xiapi
+        except ImportError:
+            logger.warning("Ximea xiapi module not available. Cannot discover Ximea cameras.")
+            return []
+        
+        try:
+            # Get number of connected cameras
+            num_cameras = xiapi.Camera().get_number_devices()
+            
+            for i in range(num_cameras):
+                try:
+                    # Create temporary camera instance to get device info
+                    temp_cam = xiapi.Camera()
+                    temp_cam.open_device()
+                    
+                    # Get device information (simplified since Ximea API varies)
+                    device_data = {
+                        'index': i,
+                        'serial_number': f"ximea_{i}",
+                        'device_name': f"Ximea Camera {i}",
+                        'device_type': 'Ximea'
+                    }
+                    
+                    temp_cam.close_device()
+                    devices.append(device_data)
+                    logger.info(f"Found Ximea camera: {device_data}")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not get info for Ximea device {i}: {e}")
+                    continue
+            
+        except Exception as e:
+            logger.error(f"Error discovering Ximea cameras: {e}")
+        
+        return devices
 
 if __name__ == "__main__":
     # Example usage
