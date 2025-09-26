@@ -3,7 +3,7 @@ import cv2
 import threading
 import time
 import logging
-from typing import Optional, Tuple, Any, Union
+from typing import Optional, Tuple, Any, Union, Dict
 from pathlib import Path
 
 try:
@@ -57,24 +57,24 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         super().__init__(source, **kwargs)
         
         # Spectrogram parameters
-        self.n_mels = kwargs.get('n_mels', 128)
-        self.n_fft = kwargs.get('n_fft', 2048)
-        self.hop_length = kwargs.get('hop_length', 512)
-        self.window_duration = kwargs.get('window_duration', 2.0)
-        self.freq_range = kwargs.get('freq_range', (20, 8000))
-        self.sample_rate = kwargs.get('sample_rate', 44100)  # Increased to support higher frequencies
+        self.n_mels = int(kwargs.get('n_mels', 128))
+        self.n_fft = int(kwargs.get('n_fft', 2048))
+        self.hop_length = int(kwargs.get('hop_length', 512))
+        self.window_duration = float(kwargs.get('window_duration', 2.0))
+        self.freq_range = tuple(map(int, kwargs.get('freq_range', '20,8000').split(',')))
+        self.sample_rate = int(kwargs.get('sample_rate', 44100))  # Increased to support higher frequencies
         self.colormap = kwargs.get('colormap', None)  # None means grayscale (no colormap applied)
         self.db_range = kwargs.get('db_range', (-80, 0))
-        self.frame_rate = kwargs.get('frame_rate', 30)
-        self.audio_buffer_size = kwargs.get('audio_buffer_size', 1024)
-        
+        self.frame_rate = int(kwargs.get('frame_rate', 30))
+        self.audio_buffer_size = int(kwargs.get('audio_buffer_size', 1024))
+
         # Contrast enhancement parameters
         self.contrast_method = kwargs.get('contrast_method', 'fixed')  # 'fixed', 'adaptive', 'percentile'
-        self.adaptive_alpha = kwargs.get('adaptive_alpha', 0.95)  # Smoothing factor for adaptive normalization
-        self.percentile_range = kwargs.get('percentile_range', (5, 95))  # Percentile range for normalization
-        self.gamma_correction = kwargs.get('gamma_correction', 1.0)  # Gamma correction for contrast
-        self.noise_floor = kwargs.get('noise_floor', -70)  # Noise floor in dB
-        
+        self.adaptive_alpha = float(kwargs.get('adaptive_alpha', 0.95))  # Smoothing factor for adaptive normalization
+        self.percentile_range = tuple(map(int, kwargs.get('percentile_range', (5, 95))))
+        self.gamma_correction = float(kwargs.get('gamma_correction', 1.0))  # Gamma correction for contrast
+        self.noise_floor = float(kwargs.get('noise_floor', -70))  # Noise floor in dB
+
         # Adaptive normalization state
         self._adaptive_min = None
         self._adaptive_max = None
@@ -745,6 +745,159 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             logger.error(f"Error discovering audio devices: {e}")
         
         return devices
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for audio spectrogram capture"""
+        return {
+            'title': 'Audio Spectrogram Configuration',
+            'description': 'Configure audio spectrogram capture from microphones or audio files',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Audio Source',
+                    'type': 'text',
+                    'placeholder': '0 or /path/to/audio.wav',
+                    'description': 'Microphone index (0, 1, 2...) or path to audio file',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'n_mels',
+                    'label': 'Mel Bands',
+                    'type': 'number',
+                    'min': 32,
+                    'max': 256,
+                    'placeholder': '128',
+                    'description': 'Number of mel frequency bands in spectrogram',
+                    'required': False,
+                    'default': 128
+                },
+                {
+                    'name': 'n_fft',
+                    'label': 'FFT Window Size',
+                    'type': 'select',
+                    'options': [
+                        {'value': 512, 'label': '512'},
+                        {'value': 1024, 'label': '1024'},
+                        {'value': 2048, 'label': '2048'},
+                        {'value': 4096, 'label': '4096'}
+                    ],
+                    'description': 'FFT window size for frequency analysis',
+                    'required': False,
+                    'default': 2048
+                },
+                {
+                    'name': 'hop_length',
+                    'label': 'Hop Length',
+                    'type': 'number',
+                    'min': 128,
+                    'max': 2048,
+                    'placeholder': '512',
+                    'description': 'Number of samples between successive frames',
+                    'required': False,
+                    'default': 512
+                },
+                {
+                    'name': 'window_duration',
+                    'label': 'Window Duration (s)',
+                    'type': 'number',
+                    'min': 0.5,
+                    'max': 10.0,
+                    'step': 0.1,
+                    'placeholder': '2.0',
+                    'description': 'Duration of audio window in seconds',
+                    'required': False,
+                    'default': 2.0
+                },
+                {
+                    'name': 'sample_rate',
+                    'label': 'Sample Rate (Hz)',
+                    'type': 'select',
+                    'options': [
+                        {'value': 22050, 'label': '22050'},
+                        {'value': 44100, 'label': '44100'},
+                        {'value': 48000, 'label': '48000'},
+                        {'value': 96000, 'label': '96000'}
+                    ],
+                    'description': 'Audio sample rate in Hz',
+                    'required': False,
+                    'default': 44100
+                },
+                {
+                    'name': 'freq_range',
+                    'label': 'Frequency Range (Hz)',
+                    'type': 'text',
+                    'placeholder': '20,8000',
+                    'description': 'Frequency range as "min,max" (e.g., "20,8000")',
+                    'required': False,
+                    'default': '20,8000'
+                },
+                {
+                    'name': 'frame_rate',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 60,
+                    'placeholder': '30',
+                    'description': 'Spectrogram update rate in frames per second',
+                    'required': False,
+                    'default': 30
+                },
+                {
+                    'name': 'colormap',
+                    'label': 'Color Map',
+                    'type': 'select',
+                    'options': [
+                        {'value': None, 'label': 'Grayscale'},
+                        {'value': 2, 'label': 'Jet'},
+                        {'value': 9, 'label': 'Hot'},
+                        {'value': 11, 'label': 'Viridis'},
+                        {'value': 13, 'label': 'Plasma'},
+                        {'value': 21, 'label': 'Turbo'}
+                    ],
+                    'description': 'Color mapping for spectrogram visualization',
+                    'required': False,
+                    'default': None
+                },
+                {
+                    'name': 'contrast_method',
+                    'label': 'Contrast Method',
+                    'type': 'select',
+                    'options': [
+                        {'value': 'fixed', 'label': 'Fixed Range'},
+                        {'value': 'adaptive', 'label': 'Adaptive'},
+                        {'value': 'percentile', 'label': 'Percentile'}
+                    ],
+                    'description': 'Method for contrast enhancement',
+                    'required': False,
+                    'default': 'fixed'
+                },
+                {
+                    'name': 'gamma_correction',
+                    'label': 'Gamma Correction',
+                    'type': 'number',
+                    'min': 0.1,
+                    'max': 3.0,
+                    'step': 0.1,
+                    'placeholder': '1.0',
+                    'description': 'Gamma correction for contrast (< 1.0 increases contrast)',
+                    'required': False,
+                    'default': 1.0
+                },
+                {
+                    'name': 'noise_floor',
+                    'label': 'Noise Floor (dB)',
+                    'type': 'number',
+                    'min': -100,
+                    'max': -20,
+                    'placeholder': '-70',
+                    'description': 'Noise floor in dB to suppress background noise',
+                    'required': False,
+                    'default': -70
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":

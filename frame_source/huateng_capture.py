@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import logging
 import platform
@@ -228,6 +228,80 @@ class HuatengCapture(VideoCaptureBase):
             logger.error(f"Error discovering Huateng cameras: {e}")
         
         return devices
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for Huateng camera capture"""
+        return {
+            'title': 'Huateng Camera Configuration',
+            'description': 'Configure Huateng industrial camera capture settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Camera Index',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 10,
+                    'placeholder': '0',
+                    'description': 'Index of the Huateng camera to use (0 for first camera)',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'is_mono',
+                    'label': 'Monochrome Mode',
+                    'type': 'checkbox',
+                    'description': 'Enable monochrome (grayscale) capture mode',
+                    'required': False,
+                    'default': False
+                },
+                {
+                    'name': 'exposure',
+                    'label': 'Exposure Time (μs)',
+                    'type': 'number',
+                    'min': 100,
+                    'max': 100000,
+                    'placeholder': '10000',
+                    'description': 'Camera exposure time in microseconds',
+                    'required': False,
+                    'default': 10000
+                },
+                {
+                    'name': 'gain',
+                    'label': 'Gain',
+                    'type': 'number',
+                    'min': 2,
+                    'max': 6,
+                    'step': 0.1,
+                    'placeholder': '2.0',
+                    'description': 'Camera gain value (2-6 range)',
+                    'required': False,
+                    'default': 2.0
+                },
+                {
+                    'name': 'width',
+                    'label': 'Frame Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 2048,
+                    'placeholder': '640',
+                    'description': 'Width of captured frames in pixels',
+                    'required': False,
+                    'default': 640
+                },
+                {
+                    'name': 'height',
+                    'label': 'Frame Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 1536,
+                    'placeholder': '480',
+                    'description': 'Height of captured frames in pixels',
+                    'required': False,
+                    'default': 480
+                }
+            ]
+        }
 
 if __name__ == "__main__":
     # Example usage

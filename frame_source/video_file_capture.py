@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import cv2
 import logging
@@ -184,6 +184,61 @@ class VideoFileCapture(VideoCaptureBase):
         # Video file capture doesn't discover devices - it works with file paths
         logger.info("VideoFileCapture uses file paths as sources, not discoverable devices.")
         return []
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for video file capture"""
+        return {
+            'title': 'Video File Configuration',
+            'description': 'Configure video file playback settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Video File Path',
+                    'type': 'file',
+                    'accept': '.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm',
+                    'placeholder': 'path/to/video.mp4',
+                    'description': 'Path to video file',
+                    'required': True
+                },
+                {
+                    'name': 'loop',
+                    'label': 'Loop Playback',
+                    'type': 'checkbox',
+                    'description': 'Restart video from beginning when it ends',
+                    'required': False,
+                    'default': False
+                },
+                {
+                    'name': 'real_time',
+                    'label': 'Real-time Playback',
+                    'type': 'checkbox',
+                    'description': 'Play video at original frame rate (disable for fastest processing)',
+                    'required': False,
+                    'default': True
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 4096,
+                    'placeholder': '1920',
+                    'description': 'Resize frame width (optional)',
+                    'required': False
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 2160,
+                    'placeholder': '1080',
+                    'description': 'Resize frame height (optional)',
+                    'required': False
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":

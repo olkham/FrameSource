@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import cv2
 import logging
@@ -174,6 +174,71 @@ class IPCameraCapture(VideoCaptureBase):
         # IP cameras require manual configuration - cannot be auto-discovered easily
         logger.info("IPCameraCapture requires manual configuration with URLs and credentials.")
         return []
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for IP camera capture"""
+        return {
+            'title': 'IP Camera Configuration',
+            'description': 'Configure IP camera with RTSP/HTTP stream settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Stream URL',
+                    'type': 'text',
+                    'placeholder': 'rtsp://192.168.1.100:554/stream1',
+                    'description': 'RTSP or HTTP stream URL',
+                    'required': True
+                },
+                {
+                    'name': 'username',
+                    'label': 'Username',
+                    'type': 'text',
+                    'placeholder': 'admin',
+                    'description': 'Camera login username (optional)',
+                    'required': False
+                },
+                {
+                    'name': 'password',
+                    'label': 'Password',
+                    'type': 'password',
+                    'placeholder': 'password',
+                    'description': 'Camera login password (optional)',
+                    'required': False
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 4096,
+                    'placeholder': '1920',
+                    'description': 'Frame width in pixels (if supported)',
+                    'required': False
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 2160,
+                    'placeholder': '1080',
+                    'description': 'Frame height in pixels (if supported)',
+                    'required': False
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 60,
+                    'placeholder': '25',
+                    'description': 'Expected frame rate (informational)',
+                    'required': False,
+                    'default': 25
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":

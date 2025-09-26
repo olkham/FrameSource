@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 import numpy as np
 import logging
 try:
@@ -323,6 +323,88 @@ class XimeaCapture(VideoCaptureBase):
             logger.error(f"Error discovering Ximea cameras: {e}")
         
         return devices
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for Ximea camera capture"""
+        return {
+            'title': 'Ximea Camera Configuration',
+            'description': 'Configure Ximea industrial camera capture settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Camera Index',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 10,
+                    'placeholder': '0',
+                    'description': 'Index of the Ximea camera to use (0 for first camera)',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'is_mono',
+                    'label': 'Monochrome Mode',
+                    'type': 'checkbox',
+                    'description': 'Enable monochrome (grayscale) capture mode',
+                    'required': False,
+                    'default': False
+                },
+                {
+                    'name': 'exposure',
+                    'label': 'Exposure Time (μs)',
+                    'type': 'number',
+                    'min': 10,
+                    'max': 1000000,
+                    'placeholder': '10000',
+                    'description': 'Camera exposure time in microseconds',
+                    'required': False,
+                    'default': 10000
+                },
+                {
+                    'name': 'gain',
+                    'label': 'Gain (dB)',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 24,
+                    'step': 0.1,
+                    'placeholder': '0.0',
+                    'description': 'Camera gain value in decibels',
+                    'required': False,
+                    'default': 0.0
+                },
+                {
+                    'name': 'width',
+                    'label': 'Frame Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 4096,
+                    'placeholder': '1920',
+                    'description': 'Width of captured frames in pixels',
+                    'required': False,
+                    'default': 1920
+                },
+                {
+                    'name': 'height',
+                    'label': 'Frame Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 3000,
+                    'placeholder': '1080',
+                    'description': 'Height of captured frames in pixels',
+                    'required': False,
+                    'default': 1080
+                },
+                {
+                    'name': 'auto_exposure',
+                    'label': 'Auto Exposure',
+                    'type': 'checkbox',
+                    'description': 'Enable automatic exposure adjustment',
+                    'required': False,
+                    'default': False
+                }
+            ]
+        }
 
 if __name__ == "__main__":
     # Example usage

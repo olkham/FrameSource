@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import cv2
 import logging
@@ -403,6 +403,79 @@ class WebcamCapture(VideoCaptureBase):
             logger.warning(f"Could not get Linux camera names: {e}")
             
         return names
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for webcam capture"""
+        return {
+            'title': 'Webcam Configuration',
+            'description': 'Configure USB webcam or built-in camera settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Camera Index',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 10,
+                    'placeholder': '0',
+                    'description': 'Camera device index (0 for default, 1 for second camera, etc.)',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 4096,
+                    'placeholder': '1920',
+                    'description': 'Frame width in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 2160,
+                    'placeholder': '1080',
+                    'description': 'Frame height in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 120,
+                    'placeholder': '30',
+                    'description': 'Frames per second',
+                    'required': False,
+                    'default': 30
+                },
+                {
+                    'name': 'exposure',
+                    'label': 'Exposure',
+                    'type': 'number',
+                    'min': -13,
+                    'max': -1,
+                    'step': 1,
+                    'placeholder': '-6',
+                    'description': 'Manual exposure value (-13 to -1, lower = brighter)',
+                    'required': False
+                },
+                {
+                    'name': 'gain',
+                    'label': 'Gain',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 255,
+                    'placeholder': '0',
+                    'description': 'Camera gain (0-255)',
+                    'required': False
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":

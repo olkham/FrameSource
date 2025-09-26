@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import time
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import logging
 import threading
 
@@ -204,6 +204,71 @@ class ScreenCapture(VideoCaptureBase):
             logger.error(f"Error discovering screen sources: {e}")
         
         return devices
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for screen capture"""
+        return {
+            'title': 'Screen Capture Configuration',
+            'description': 'Configure screen/monitor capture settings',
+            'fields': [
+                {
+                    'name': 'x',
+                    'label': 'X Position',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 5000,
+                    'placeholder': '0',
+                    'description': 'Left edge of capture area (pixels from left)',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'y',
+                    'label': 'Y Position',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 5000,
+                    'placeholder': '0',
+                    'description': 'Top edge of capture area (pixels from top)',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'w',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 5000,
+                    'placeholder': '640',
+                    'description': 'Width of capture area in pixels',
+                    'required': False,
+                    'default': 640
+                },
+                {
+                    'name': 'h',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 5000,
+                    'placeholder': '480',
+                    'description': 'Height of capture area in pixels',
+                    'required': False,
+                    'default': 480
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 60,
+                    'placeholder': '30',
+                    'description': 'Frames per second for screen capture',
+                    'required': False,
+                    'default': 30
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":

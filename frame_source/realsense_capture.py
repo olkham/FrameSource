@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import cv2
 import logging
@@ -417,6 +417,97 @@ class RealsenseCapture(VideoCaptureBase):
             logger.error(f"Error discovering RealSense cameras: {e}")
         
         return devices
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for RealSense camera capture"""
+        return {
+            'title': 'RealSense Camera Configuration',
+            'description': 'Configure Intel RealSense depth camera settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Camera Index',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 10,
+                    'placeholder': '0',
+                    'description': 'Camera device index (0 for first RealSense camera)',
+                    'required': False,
+                    'default': 0
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 424,
+                    'max': 1920,
+                    'placeholder': '640',
+                    'description': 'Frame width in pixels',
+                    'required': False,
+                    'default': 640
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 240,
+                    'max': 1080,
+                    'placeholder': '480',
+                    'description': 'Frame height in pixels',
+                    'required': False,
+                    'default': 480
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 6,
+                    'max': 90,
+                    'placeholder': '30',
+                    'description': 'Frames per second',
+                    'required': False,
+                    'default': 30
+                },
+                {
+                    'name': 'depth_range_min',
+                    'label': 'Min Depth Range (m)',
+                    'type': 'number',
+                    'min': 0.1,
+                    'max': 5.0,
+                    'step': 0.1,
+                    'placeholder': '0.3',
+                    'description': 'Minimum depth detection range in meters',
+                    'required': False,
+                    'default': 0.3
+                },
+                {
+                    'name': 'depth_range_max',
+                    'label': 'Max Depth Range (m)',
+                    'type': 'number',
+                    'min': 1.0,
+                    'max': 10.0,
+                    'step': 0.1,
+                    'placeholder': '3.0',
+                    'description': 'Maximum depth detection range in meters',
+                    'required': False,
+                    'default': 3.0
+                },
+                {
+                    'name': 'output_type',
+                    'label': 'Output Type',
+                    'type': 'select',
+                    'options': [
+                        {'value': 'color', 'label': 'Color Only'},
+                        {'value': 'depth', 'label': 'Depth Only'},
+                        {'value': 'both', 'label': 'Color + Depth'}
+                    ],
+                    'description': 'Type of output frames',
+                    'required': False,
+                    'default': 'color'
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":

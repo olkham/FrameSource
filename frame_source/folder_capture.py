@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import time
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 import threading
 
 # Handle both relative imports (when used as module) and absolute imports (when run standalone)
@@ -689,6 +689,91 @@ class FolderCapture(VideoCaptureBase):
         # Folder capture doesn't discover devices - it works with folder paths
         logger.info("FolderCapture uses folder paths as sources, not discoverable devices.")
         return []
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for folder capture"""
+        return {
+            'title': 'Folder Capture Configuration',
+            'description': 'Configure image folder as video stream settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Folder Path',
+                    'type': 'folder',
+                    'placeholder': 'path/to/image/folder',
+                    'description': 'Path to folder containing image files',
+                    'required': True
+                },
+                {
+                    'name': 'sort_by',
+                    'label': 'Sort Method',
+                    'type': 'select',
+                    'options': [
+                        {'value': 'name', 'label': 'By Name'},
+                        {'value': 'date', 'label': 'By Creation Date'}
+                    ],
+                    'description': 'How to sort images in the folder',
+                    'required': False,
+                    'default': 'name'
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 120,
+                    'placeholder': '30',
+                    'description': 'Frames per second for playback',
+                    'required': False,
+                    'default': 30
+                },
+                {
+                    'name': 'loop',
+                    'label': 'Loop Playback',
+                    'type': 'checkbox',
+                    'description': 'Restart from first image when reaching the end',
+                    'required': False,
+                    'default': False
+                },
+                {
+                    'name': 'real_time',
+                    'label': 'Real-time Playback',
+                    'type': 'checkbox',
+                    'description': 'Play at specified frame rate (disable for fastest processing)',
+                    'required': False,
+                    'default': True
+                },
+                {
+                    'name': 'watch_folder',
+                    'label': 'Watch for Changes',
+                    'type': 'checkbox',
+                    'description': 'Automatically detect when files are added/removed',
+                    'required': False,
+                    'default': True
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 160,
+                    'max': 4096,
+                    'placeholder': 'original',
+                    'description': 'Resize frame width (optional)',
+                    'required': False
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 120,
+                    'max': 2160,
+                    'placeholder': 'original',
+                    'description': 'Resize frame height (optional)',
+                    'required': False
+                }
+            ]
+        }
 
 # Standalone test code
 if __name__ == "__main__":

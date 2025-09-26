@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 
 import numpy as np
 
@@ -14,6 +14,103 @@ logger = logging.getLogger(__name__)
 
 
 class GenicamCapture(VideoCaptureBase):
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for GenICam capture"""
+        return {
+            'title': 'GenICam Camera Configuration',
+            'description': 'Configure GenICam compliant camera settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Camera Source',
+                    'type': 'text',
+                    'placeholder': 'Serial number or device index (0, 1, 2...)',
+                    'description': 'Camera serial number or device index',
+                    'required': False,
+                    'default': '0'
+                },
+                {
+                    'name': 'cti_files',
+                    'label': 'CTI Files',
+                    'type': 'text',
+                    'placeholder': '/path/to/producer.cti',
+                    'description': 'GenTL producer files (comma-separated)',
+                    'required': False
+                },
+                {
+                    'name': 'exposure',
+                    'label': 'Exposure Time (µs)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 1000000,
+                    'placeholder': '10000',
+                    'description': 'Exposure time in microseconds',
+                    'required': False
+                },
+                {
+                    'name': 'gain',
+                    'label': 'Gain (dB)',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 40,
+                    'step': 0.1,
+                    'placeholder': '0.0',
+                    'description': 'Camera gain in decibels',
+                    'required': False
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 10000,
+                    'placeholder': '1920',
+                    'description': 'Frame width in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 10000,
+                    'placeholder': '1080',
+                    'description': 'Frame height in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 240,
+                    'placeholder': '30',
+                    'description': 'Frames per second',
+                    'required': False,
+                    'default': 30
+                },
+                {
+                    'name': 'x',
+                    'label': 'X Offset',
+                    'type': 'number',
+                    'min': 0,
+                    'placeholder': '0',
+                    'description': 'Horizontal offset in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'y',
+                    'label': 'Y Offset',
+                    'type': 'number',
+                    'min': 0,
+                    'placeholder': '0',
+                    'description': 'Vertical offset in pixels',
+                    'required': False
+                }
+            ]
+        }
+
     def start_async(self):
         """
         Start background thread to continuously capture frames from a Genicam compliant camera.

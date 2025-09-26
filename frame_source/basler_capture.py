@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import logging
 
@@ -365,6 +365,85 @@ class BaslerCapture(VideoCaptureBase):
             logger.error(f"Error discovering Basler cameras: {e}")
         
         return devices
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get configuration schema for Basler camera capture"""
+        return {
+            'title': 'Basler Camera Configuration',
+            'description': 'Configure Basler industrial camera settings',
+            'fields': [
+                {
+                    'name': 'source',
+                    'label': 'Camera Source',
+                    'type': 'text',
+                    'placeholder': 'Serial number or device index (0, 1, 2...)',
+                    'description': 'Camera serial number or device index',
+                    'required': False,
+                    'default': '0'
+                },
+                {
+                    'name': 'exposure',
+                    'label': 'Exposure Time (µs)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 1000000,
+                    'placeholder': '10000',
+                    'description': 'Exposure time in microseconds',
+                    'required': False
+                },
+                {
+                    'name': 'gain',
+                    'label': 'Gain (dB)',
+                    'type': 'number',
+                    'min': 0,
+                    'max': 40,
+                    'step': 0.1,
+                    'placeholder': '0.0',
+                    'description': 'Camera gain in decibels',
+                    'required': False
+                },
+                {
+                    'name': 'width',
+                    'label': 'Width',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 10000,
+                    'placeholder': '1920',
+                    'description': 'Frame width in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'height',
+                    'label': 'Height',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 10000,
+                    'placeholder': '1080',
+                    'description': 'Frame height in pixels',
+                    'required': False
+                },
+                {
+                    'name': 'fps',
+                    'label': 'Frame Rate (FPS)',
+                    'type': 'number',
+                    'min': 1,
+                    'max': 1000,
+                    'placeholder': '30',
+                    'description': 'Frames per second',
+                    'required': False,
+                    'default': 30
+                },
+                {
+                    'name': 'is_mono',
+                    'label': 'Monochrome',
+                    'type': 'checkbox',
+                    'description': 'Camera outputs monochrome (grayscale) images',
+                    'required': False,
+                    'default': False
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":
