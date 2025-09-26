@@ -61,9 +61,14 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         self.n_fft = int(kwargs.get('n_fft', 2048))
         self.hop_length = int(kwargs.get('hop_length', 512))
         self.window_duration = float(kwargs.get('window_duration', 2.0))
-        self.freq_range = tuple(map(int, kwargs.get('freq_range', '20,8000').split(',')))
+        freq_range_str = kwargs.get('freq_range', '20,8000').split(',')
+        if len(freq_range_str) != 2:
+            raise ValueError("freq_range must contain exactly 2 values: min_freq,max_freq")
+        self.freq_range = (float(freq_range_str[0]), float(freq_range_str[1]))
         self.sample_rate = int(kwargs.get('sample_rate', 44100))  # Increased to support higher frequencies
-        self.colormap = kwargs.get('colormap', None)  # None means grayscale (no colormap applied)
+        # Validate and set colormap
+        colormap_param = kwargs.get('colormap', None)
+        self.colormap = self._validate_colormap(colormap_param)
         self.db_range = kwargs.get('db_range', (-80, 0))
         self.frame_rate = int(kwargs.get('frame_rate', 30))
         self.audio_buffer_size = int(kwargs.get('audio_buffer_size', 1024))
@@ -71,7 +76,11 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         # Contrast enhancement parameters
         self.contrast_method = kwargs.get('contrast_method', 'fixed')  # 'fixed', 'adaptive', 'percentile'
         self.adaptive_alpha = float(kwargs.get('adaptive_alpha', 0.95))  # Smoothing factor for adaptive normalization
-        self.percentile_range = tuple(map(int, kwargs.get('percentile_range', (5, 95))))
+        percentile_param = kwargs.get('percentile_range', (5, 95))
+        if isinstance(percentile_param, (tuple, list)) and len(percentile_param) == 2:
+            self.percentile_range = (float(percentile_param[0]), float(percentile_param[1]))
+        else:
+            self.percentile_range = (5.0, 95.0)
         self.gamma_correction = float(kwargs.get('gamma_correction', 1.0))  # Gamma correction for contrast
         self.noise_floor = float(kwargs.get('noise_floor', -70))  # Noise floor in dB
 
@@ -389,8 +398,22 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         mel_uint8 = np.flipud(mel_uint8)
         
         # Apply colormap if specified, otherwise return grayscale
-        if self.colormap is not None:
-            colored = cv2.applyColorMap(mel_uint8, self.colormap)
+        if self.colormap is not None and isinstance(self.colormap, int):
+            try:
+                # Ensure mel_uint8 is a proper numpy array with correct dtype
+                if not isinstance(mel_uint8, np.ndarray):
+                    logger.warning("mel_uint8 is not a numpy array, converting...")
+                    mel_uint8 = np.array(mel_uint8, dtype=np.uint8)
+                    
+                # Ensure it's uint8
+                if mel_uint8.dtype != np.uint8:
+                    mel_uint8 = mel_uint8.astype(np.uint8)
+                
+                colored = cv2.applyColorMap(mel_uint8, self.colormap)
+            except Exception as e:
+                logger.warning(f"Failed to apply colormap {self.colormap}: {e}. Using grayscale.")
+                # Fallback to grayscale
+                colored = cv2.cvtColor(mel_uint8, cv2.COLOR_GRAY2BGR)
         else:
             # Convert grayscale to 3-channel for consistency with colored spectrograms
             colored = cv2.cvtColor(mel_uint8, cv2.COLOR_GRAY2BGR)
@@ -493,6 +516,65 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             return True
         return False
 
+    def _validate_colormap(self, colormap_param) -> Optional[int]:
+        """
+        Validate and convert colormap parameter to proper OpenCV colormap constant.
+        
+        Args:
+            colormap_param: Colormap parameter (int, str, or None)
+            
+        Returns:
+            Optional[int]: Valid OpenCV colormap constant or None
+        """
+        if colormap_param is None or colormap_param == '':
+            return None
+            
+        # If it's already an integer, validate it's a valid OpenCV colormap
+        if isinstance(colormap_param, int):
+            # OpenCV colormap constants are typically 0-21
+            if 0 <= colormap_param <= 21:
+                return colormap_param
+            else:
+                logger.warning(f"Invalid colormap integer {colormap_param}, using grayscale")
+                return None
+                
+        # If it's a string, try to convert to OpenCV constant
+        if isinstance(colormap_param, str):
+            colormap_map = {
+                'AUTUMN': cv2.COLORMAP_AUTUMN,
+                'BONE': cv2.COLORMAP_BONE,
+                'JET': cv2.COLORMAP_JET,
+                'WINTER': cv2.COLORMAP_WINTER,
+                'RAINBOW': cv2.COLORMAP_RAINBOW,
+                'OCEAN': cv2.COLORMAP_OCEAN,
+                'SUMMER': cv2.COLORMAP_SUMMER,
+                'SPRING': cv2.COLORMAP_SPRING,
+                'COOL': cv2.COLORMAP_COOL,
+                'HSV': cv2.COLORMAP_HSV,
+                'PINK': cv2.COLORMAP_PINK,
+                'HOT': cv2.COLORMAP_HOT,
+                'PARULA': cv2.COLORMAP_PARULA,
+                'MAGMA': cv2.COLORMAP_MAGMA,
+                'INFERNO': cv2.COLORMAP_INFERNO,
+                'PLASMA': cv2.COLORMAP_PLASMA,
+                'VIRIDIS': cv2.COLORMAP_VIRIDIS,
+                'CIVIDIS': cv2.COLORMAP_CIVIDIS,
+                'TWILIGHT': cv2.COLORMAP_TWILIGHT,
+                'TWILIGHT_SHIFTED': cv2.COLORMAP_TWILIGHT_SHIFTED,
+                'TURBO': cv2.COLORMAP_TURBO,
+                'DEEPGREEN': cv2.COLORMAP_DEEPGREEN,
+            }
+            
+            colormap_name = colormap_param.upper()
+            if colormap_name in colormap_map:
+                return colormap_map[colormap_name]
+            else:
+                logger.warning(f"Unknown colormap name '{colormap_param}', using grayscale")
+                return None
+                
+        logger.warning(f"Invalid colormap type {type(colormap_param)}, using grayscale")
+        return None
+
     def set_colormap(self, colormap: Optional[int]) -> bool:
         """
         Set the colormap for spectrogram visualization.
@@ -503,8 +585,8 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         Returns:
             bool: True if successful
         """
-        self.colormap = colormap
-        colormap_name = "grayscale" if colormap is None else f"cv2 colormap {colormap}"
+        self.colormap = self._validate_colormap(colormap)
+        colormap_name = "grayscale" if self.colormap is None else f"cv2 colormap {self.colormap}"
         logger.info(f"Colormap set to {colormap_name}")
         return True
     
@@ -849,16 +931,25 @@ class AudioSpectrogramCapture(VideoCaptureBase):
                     'label': 'Color Map',
                     'type': 'select',
                     'options': [
-                        {'value': None, 'label': 'Grayscale'},
-                        {'value': 2, 'label': 'Jet'},
-                        {'value': 9, 'label': 'Hot'},
-                        {'value': 11, 'label': 'Viridis'},
-                        {'value': 13, 'label': 'Plasma'},
-                        {'value': 21, 'label': 'Turbo'}
+                        {'value': '', 'label': 'Grayscale'},
+                        {'value': 'JET', 'label': 'Jet'},
+                        {'value': 'HOT', 'label': 'Hot'},
+                        {'value': 'VIRIDIS', 'label': 'Viridis'},
+                        {'value': 'PLASMA', 'label': 'Plasma'},
+                        {'value': 'INFERNO', 'label': 'Inferno'},
+                        {'value': 'MAGMA', 'label': 'Magma'},
+                        {'value': 'TURBO', 'label': 'Turbo'},
+                        {'value': 'RAINBOW', 'label': 'Rainbow'},
+                        {'value': 'OCEAN', 'label': 'Ocean'},
+                        {'value': 'COOL', 'label': 'Cool'},
+                        {'value': 'SPRING', 'label': 'Spring'},
+                        {'value': 'SUMMER', 'label': 'Summer'},
+                        {'value': 'AUTUMN', 'label': 'Autumn'},
+                        {'value': 'WINTER', 'label': 'Winter'}
                     ],
                     'description': 'Color mapping for spectrogram visualization',
                     'required': False,
-                    'default': None
+                    'default': ''
                 },
                 {
                     'name': 'contrast_method',
