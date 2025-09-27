@@ -7,7 +7,14 @@ try:
 except ImportError:
     # If running as main script, try absolute import
     from video_capture_base import VideoCaptureBase
-import mvsdk as mvsdk
+try:
+    import mvsdk as mvsdk
+except ImportError:
+    try:
+        from . import mvsdk
+    except ImportError:
+        raise ImportError("mvsdk module is required for HuatengCapture but is not installed.")
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
