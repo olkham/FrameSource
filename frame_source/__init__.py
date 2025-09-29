@@ -11,8 +11,6 @@ from .video_file_capture import VideoFileCapture
 from .folder_capture import FolderCapture
 from .realsense_capture import RealsenseCapture
 from .screen_capture import ScreenCapture
-from .ximea_capture import XimeaCapture
-from .huateng_capture import HuatengCapture
 
 
 def get_available_sources():
@@ -40,14 +38,6 @@ def get_available_sources():
             'description': 'Industrial camera',
             'icon': 'fas fa-camera',
             'class': BaslerCapture,
-            'primary': True
-        },
-        {
-            'type': 'ximea',
-            'name': 'Ximea',
-            'description': 'High-speed camera',
-            'icon': 'fas fa-camera-retro',
-            'class': XimeaCapture,
             'primary': True
         },
         {
@@ -96,14 +86,6 @@ def get_available_sources():
             'description': 'Generic camera interface',
             'icon': 'fas fa-camera',
             'class': GenicamCapture,
-            'primary': False
-        },
-        {
-            'type': 'huateng',
-            'name': 'Huateng',
-            'description': 'Huateng industrial camera',
-            'icon': 'fas fa-camera',
-            'class': HuatengCapture,
             'primary': False
         }
     ]

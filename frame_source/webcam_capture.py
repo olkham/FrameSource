@@ -85,7 +85,7 @@ class WebcamCapture(VideoCaptureBase):
         self.source = source if isinstance(source, int) else 0
 
         if 'is_mono' in kwargs:
-            logger.warning("'is_mono' argument is only used for Ximea cameras and has no effect for webcams.")
+            logger.warning("'is_mono' argument is only used for certain industrial cameras and has no effect for webcams.")
         
     def connect(self) -> bool:
         """Connect to webcam."""

@@ -4,7 +4,7 @@ Video Capture System with Factory Pattern
 A comprehensive video capture system that supports multiple backends:
 - Webcam (OpenCV)
 - IP Camera (RTSP/HTTP)
-- Ximea cameras
+- Industrial cameras (Basler, GenICam)
 - Custom capture APIs
 
 Usage:
@@ -21,7 +21,6 @@ from .genicam_capture import GenicamCapture
 from .realsense_capture import RealsenseCapture
 from .video_capture_base import VideoCaptureBase
 from .basler_capture import BaslerCapture
-from .ximea_capture import XimeaCapture
 from .webcam_capture import WebcamCapture
 from .ipcamera_capture import IPCameraCapture
 from .video_file_capture import VideoFileCapture
@@ -42,7 +41,6 @@ class FrameSourceFactory:
         'video_file': VideoFileCapture,
         'webcam': WebcamCapture,
         'ipcam': IPCameraCapture,
-        'ximea': XimeaCapture,
         'basler': BaslerCapture,
         'realsense': RealsenseCapture,
         'screen': ScreenCapture,
@@ -56,7 +54,7 @@ class FrameSourceFactory:
         Create a video capture instance.
         
         Args:
-            capture_type: Type of capture ('webcam', 'ipcam', 'ximea', 'custom')
+            capture_type: Type of capture ('webcam', 'ipcam', 'basler', 'genicam', 'custom')
             source: Source identifier
             **kwargs: Additional parameters for the specific capture type
             
