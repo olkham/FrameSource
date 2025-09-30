@@ -195,10 +195,9 @@ class VideoFileCapture(VideoCaptureBase):
                 {
                     'name': 'source',
                     'label': 'Video File Path',
-                    'type': 'file',
-                    'accept': '.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm',
-                    'placeholder': 'path/to/video.mp4',
-                    'description': 'Path to video file',
+                    'type': 'text',
+                    'placeholder': 'C:/path/to/video.mp4',
+                    'description': 'Full path to video file (supports .mp4, .avi, .mov, .mkv, .wmv, .flv, .webm)',
                     'required': True
                 },
                 {
