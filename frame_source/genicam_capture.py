@@ -592,6 +592,7 @@ class GenicamCapture(VideoCaptureBase):
                 try:
                     device_data = {
                         'index': i,
+                        'id': i,
                         'serial_number': getattr(device_info, 'serial_number', f'genicam_{i}'),
                         'name': getattr(device_info, 'model', 'GenICam Camera'),
                         'vendor': getattr(device_info, 'vendor', 'Unknown')
