@@ -590,11 +590,12 @@ class GenicamCapture(VideoCaptureBase):
             
             for i, device_info in enumerate(harvester.device_info_list):
                 try:
+                    serial = getattr(device_info, 'serial_number', f'genicam_{i}')
                     device_data = {
                         'index': i,
                         'id': i,
-                        'serial_number': getattr(device_info, 'serial_number', f'genicam_{i}'),
-                        'name': getattr(device_info, 'model', 'GenICam Camera'),
+                        'serial_number': serial,
+                        'name': serial,
                         'vendor': getattr(device_info, 'vendor', 'Unknown')
                     }
                     devices.append(device_data)
