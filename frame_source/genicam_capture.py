@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional, Tuple, Any, Dict
 
 import numpy as np
@@ -295,6 +296,9 @@ class GenicamCapture(VideoCaptureBase):
             cti_files = self.config.get("cti_files",[])
             for cti_file in cti_files:
                 self.h.add_file(cti_file)
+            for file in GenicamCapture.find_cti_paths():
+                self.h.add_file(file)
+
             self.h.update()
 
             devices = self.h.device_info_list
@@ -539,6 +543,17 @@ class GenicamCapture(VideoCaptureBase):
         except Exception:
             return None
 
+    @staticmethod
+    def find_cti_paths():
+        res = []
+        cti_paths = os.getenv("GENICAM_GENTL64_PATH")
+        if cti_paths and len(cti_paths) > 0:
+            files = os.listdir(cti_paths)
+            for f in files:
+                if f.endswith(".cti"):
+                    res.append(os.path.join(cti_paths, f))
+        return res
+
     @classmethod
     def discover(cls) -> list:
         """
@@ -562,9 +577,12 @@ class GenicamCapture(VideoCaptureBase):
             
             # Add common GenTL producer paths (this may need customization)
             try:
+                for file in GenicamCapture.find_cti_paths():
+                    harvester.add_file(file)
+
                 # Try to add some common GenTL producers
-                harvester.add_cti_file('/opt/pylon5/lib64/pylon_TL_GenICam.cti')  # Basler
-                harvester.add_cti_file('/opt/mvIMPACT_acquire/lib/x86_64/mvGenTLProducer.cti')  # MATRIX VISION
+                harvester.add_file('/opt/pylon5/lib64/pylon_TL_GenICam.cti')  # Basler
+                harvester.add_file('/opt/mvIMPACT_acquire/lib/x86_64/mvGenTLProducer.cti')  # MATRIX VISION
             except:
                 pass  # If paths don't exist, that's fine
             
