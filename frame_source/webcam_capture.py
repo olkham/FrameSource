@@ -82,7 +82,7 @@ class WebcamCapture(VideoCaptureBase):
         else:
             self.api_preference = cv2.CAP_V4L2   # Video4Linux for Linux
 
-        self.source = source if isinstance(source, int) else 0
+        self.source = source
 
         if 'is_mono' in kwargs:
             logger.warning("'is_mono' argument is only used for certain industrial cameras and has no effect for webcams.")
@@ -104,7 +104,7 @@ class WebcamCapture(VideoCaptureBase):
 
             self.cap = cv2.VideoCapture(src, api_pref)
             if not self.cap.isOpened():
-                logger.error(f"Failed to open webcam {self.source}")
+                logger.error(f"Failed to open webcam {src}")
                 return False
             
             # Set additional parameters if provided
