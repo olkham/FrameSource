@@ -114,7 +114,7 @@ class WebcamCapture(VideoCaptureBase):
                 self.cap.set(cv2.CAP_PROP_FPS, self.config['fps'])
                 
             self.is_connected = True
-            logger.info(f"Connected to webcam {self.source}")
+            logger.info(f"Connected to webcam {src}")
             return True
         except Exception as e:
             logger.error(f"Error connecting to webcam: {e}")
