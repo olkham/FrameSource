@@ -93,8 +93,9 @@ class WebcamCapture(VideoCaptureBase):
             src = self.source
             api_pref = self.api_preference
             # Support `api_pref/index` format or `api_pref/path` format used in list_devices `id` field
-            if isinstance(src, str) and "/" in src:
-                api_pref, src = src.split("/")
+            if isinstance(src, str) and ":" in src:
+                parts = src.split(":")
+                api_pref, src = parts[0], parts[1]
 
                 if api_pref.isdigit():
                     api_pref = int(api_pref)
@@ -243,7 +244,7 @@ class WebcamCapture(VideoCaptureBase):
             from cv2.videoio_registry import getBackendName
 
             for camera_info in enumerate_cameras():
-                devices.append({"id": f"{camera_info.backend}/{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+                devices.append({"id": f"{camera_info.backend}:{camera_info.index}:{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
             return devices
         except ImportError:
             logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
