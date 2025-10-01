@@ -243,7 +243,7 @@ class WebcamCapture(VideoCaptureBase):
             from cv2.videoio_registry import getBackendName
 
             for camera_info in enumerate_cameras():
-                devices.append({"id": f"{camera_info.backend}/{camera_info.index}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+                devices.append({"id": f"{camera_info.backend}/{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
             return devices
         except ImportError:
             logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
