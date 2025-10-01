@@ -329,7 +329,7 @@ class BaslerCapture(VideoCaptureBase):
         
         Returns:
             list: List of dictionaries containing Basler camera information.
-                Each dict contains: {'index': int, 'serial_number': str, 'model_name': str, 'device_class': str}
+                Each dict contains: {'index': int, 'serial_number': str, 'name': str, 'device_class': str}
         """
         devices = []
         
@@ -351,7 +351,7 @@ class BaslerCapture(VideoCaptureBase):
                     device_data = {
                         'index': index,
                         'serial_number': device_info.GetSerialNumber(),
-                        'model_name': device_info.GetModelName(),
+                        'name': device_info.GetModelName(),
                         'device_class': device_info.GetDeviceClass()
                     }
                     devices.append(device_data)

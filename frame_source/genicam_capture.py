@@ -561,7 +561,7 @@ class GenicamCapture(VideoCaptureBase):
         
         Returns:
             list: List of dictionaries containing GenICam camera information.
-                Each dict contains: {'index': int, 'serial_number': str, 'model_name': str, 'vendor': str}
+                Each dict contains: {'index': int, 'serial_number': str, 'name': str, 'vendor': str}
         """
         devices = []
         
@@ -593,7 +593,7 @@ class GenicamCapture(VideoCaptureBase):
                     device_data = {
                         'index': i,
                         'serial_number': getattr(device_info, 'serial_number', f'genicam_{i}'),
-                        'model_name': getattr(device_info, 'model', 'GenICam Camera'),
+                        'name': getattr(device_info, 'model', 'GenICam Camera'),
                         'vendor': getattr(device_info, 'vendor', 'Unknown')
                     }
                     devices.append(device_data)
@@ -622,7 +622,7 @@ if __name__ == "__main__":
     devices = GenicamCapture.discover()
     print("Discovered GenICam cameras:")
     for device in devices:
-        print(f"  - {device['model_name']} (Serial: {device['serial_number']})")
+        print(f"  - {device['name']} (Serial: {device['serial_number']})")
 
     camera = GenicamCapture()  # Replace with actual serial number or index
     if camera.connect():
