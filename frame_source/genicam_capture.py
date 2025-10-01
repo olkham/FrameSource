@@ -595,7 +595,7 @@ class GenicamCapture(VideoCaptureBase):
                         'index': i,
                         'id': i,
                         'serial_number': serial,
-                        'name': serial,
+                        'name': "Genicam " + getattr(device_info, 'model', 'GenICam Camera'),
                         'vendor': getattr(device_info, 'vendor', 'Unknown')
                     }
                     devices.append(device_data)
