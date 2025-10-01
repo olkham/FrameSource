@@ -352,7 +352,7 @@ class BaslerCapture(VideoCaptureBase):
                         'index': index,
                         'id': index,
                         'serial_number': device_info.GetSerialNumber(),
-                        'name': device_info.GetModelName(),
+                        'name': device_info.GetFriendlyName(),
                         'device_class': device_info.GetDeviceClass()
                     }
                     devices.append(device_data)
