@@ -14,7 +14,7 @@ Usage:
     frame = capture.read()
 """
 
-from typing import Any
+from typing import Any, Dict, List, Optional
 import logging
 
 from .genicam_capture import GenicamCapture
@@ -47,7 +47,7 @@ class FrameSourceFactory:
         'genicam': GenicamCapture,
         'audio_spectrogram': AudioSpectrogramCapture
     }
-    
+
     @classmethod
     def create(cls, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:
         """
@@ -93,7 +93,36 @@ class FrameSourceFactory:
 
         cls._capture_types[name] = capture_class
         logger.info(f"Registered new capture type: {name}")
-    
+
+    @classmethod
+    def discover_devices(cls, sources: Optional[List[str]] = None) -> Dict:
+        """
+        Discover available capture devices from the registered capture types.
+
+        This method queries each capture type for connected devices and
+        returns a dictionary mapping source names to their discovery results.
+
+        Args:
+            sources (list[str], optional): Specific source keys to limit discovery to.
+                If None, all registered capture types are queried.
+
+        Returns:
+            dict: A mapping of source keys to the discovered devices for each.
+                  Sources that return no devices are excluded.
+        """
+
+        _sources = (
+            cls._capture_types.items()
+            if sources is None
+            else ((k, v) for k, v in cls._capture_types.items() if k in sources)
+        )
+
+        return {
+            k: ret
+            for k, v in _sources
+            if (ret := v.discover())
+        }
+
     @classmethod
     def get_available_types(cls) -> list:
         """Get list of available capture types."""
