@@ -243,7 +243,14 @@ class WebcamCapture(VideoCaptureBase):
             from cv2_enumerate_cameras import enumerate_cameras
             from cv2.videoio_registry import getBackendName
 
-            for camera_info in enumerate_cameras():
+            if platform.system() == "Windows":
+                api_preference = (cv2.CAP_DSHOW, cv2.CAP_MSMF)
+            elif platform.system() == "Darwin":  # macOS
+                api_preference = cv2.CAP_AVFOUNDATION
+            else:
+                api_preference = cv2.CAP_V4L2
+
+            for camera_info in enumerate_cameras(api_preference):
                 devices.append({"id": f"{camera_info.backend}:{camera_info.index}:{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
             return devices
         except ImportError:
