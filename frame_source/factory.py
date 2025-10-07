@@ -14,7 +14,7 @@ Usage:
     frame = capture.read()
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 import logging
 
 from .genicam_capture import GenicamCapture
@@ -35,6 +35,25 @@ logger = logging.getLogger(__name__)
 
 class FrameSourceFactory:
     """Factory class for creating video capture instances."""
+
+    MediaSource = Literal[
+        'folder',
+        'video_file',
+        'webcam',
+        'ipcam',
+        'basler',
+        'realsense',
+        'screen',
+        'genicam',
+        'audio_spectrogram'
+    ]
+
+    CameraSource = Literal[
+        'webcam',
+        'realsense',
+        'genicam',
+        'basler'
+    ]
 
     _capture_types = {
         'folder': FolderCapture,
