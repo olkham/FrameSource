@@ -83,7 +83,7 @@ class WebcamCapture(VideoCaptureBase):
         else:
             self.api_preference = cv2.CAP_V4L2   # Video4Linux for Linux
 
-        self.source = source if isinstance(source, int) else 0
+        self.source = source
 
         if 'is_mono' in kwargs:
             logger.warning("'is_mono' argument is only used for certain industrial cameras and has no effect for webcams.")
@@ -91,9 +91,22 @@ class WebcamCapture(VideoCaptureBase):
     def connect(self) -> bool:
         """Connect to webcam."""
         try:
-            self.cap = cv2.VideoCapture(self.source, self.api_preference)
+            src = self.source
+            api_pref = self.api_preference
+            # Support `api_pref/index` format or `api_pref/path` format used in list_devices `id` field
+            if isinstance(src, str) and ":" in src:
+                parts = src.split(":")
+                api_pref, src = parts[0], parts[1]
+
+                if api_pref.isdigit():
+                    api_pref = int(api_pref)
+
+                if src.isdigit():
+                    src = int(src)
+
+            self.cap = cv2.VideoCapture(src, api_pref)
             if not self.cap.isOpened():
-                logger.error(f"Failed to open webcam {self.source}")
+                logger.error(f"Failed to open webcam {src}")
                 return False
             
             # Set additional parameters if provided
@@ -103,7 +116,7 @@ class WebcamCapture(VideoCaptureBase):
                 self.cap.set(cv2.CAP_PROP_FPS, self.config['fps'])
                 
             self.is_connected = True
-            logger.info(f"Connected to webcam {self.source}")
+            logger.info(f"Connected to webcam {src}")
             return True
         except Exception as e:
             logger.error(f"Error connecting to webcam: {e}")
@@ -226,6 +239,27 @@ class WebcamCapture(VideoCaptureBase):
 
     @classmethod
     def discover(cls) -> list:
+        try:
+            devices = []
+            from cv2_enumerate_cameras import enumerate_cameras
+            from cv2.videoio_registry import getBackendName
+
+            if platform.system() == "Windows":
+                api_preference = (cv2.CAP_DSHOW, cv2.CAP_MSMF)
+            elif platform.system() == "Darwin":  # macOS
+                api_preference = cv2.CAP_AVFOUNDATION
+            else:
+                api_preference = cv2.CAP_V4L2
+
+            for camera_info in enumerate_cameras(api_preference):
+                devices.append({"id": f"{camera_info.backend}:{camera_info.index}:{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+            return devices
+        except ImportError:
+            logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
+        return []
+
+    @classmethod
+    def _discover(cls) -> list:
         """
         Discover available webcam devices with real device names.
         
