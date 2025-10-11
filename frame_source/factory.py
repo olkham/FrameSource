@@ -17,7 +17,21 @@ Usage:
 from typing import Any, Dict, List, Optional, Literal
 import logging
 
-from .video_capture_base import VideoCaptureBase
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Import VideoCaptureBase with a fallback to absolute import. This allows
+# running modules directly (e.g. `python frame_source/factory.py`) without
+# causing "attempted relative import with no known parent package" errors.
+try:
+    from .video_capture_base import VideoCaptureBase
+except Exception:
+    try:
+        from video_capture_base import VideoCaptureBase
+    except Exception as e:
+        logger.error("Could not import VideoCaptureBase: %s", e)
+        raise
 
 # Import capture classes with error handling for missing dependencies
 _capture_imports = {}
@@ -25,69 +39,94 @@ _capture_imports = {}
 try:
     from .webcam_capture import WebcamCapture
     _capture_imports['webcam'] = WebcamCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"WebcamCapture unavailable: {e}")
+except ImportError:
+    try:
+        from webcam_capture import WebcamCapture
+        _capture_imports['webcam'] = WebcamCapture
+    except ImportError as e:
+        logger.warning(f"WebcamCapture unavailable: {e}")
 
 try:
     from .ipcamera_capture import IPCameraCapture
     _capture_imports['ipcam'] = IPCameraCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"IPCameraCapture unavailable: {e}")
+except ImportError:
+    try:
+        from ipcamera_capture import IPCameraCapture
+        _capture_imports['ipcam'] = IPCameraCapture
+    except ImportError as e:
+        logger.warning(f"IPCameraCapture unavailable: {e}")
 
 try:
     from .basler_capture import BaslerCapture
     _capture_imports['basler'] = BaslerCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"BaslerCapture unavailable: {e}")
+except ImportError:
+    try:
+        from basler_capture import BaslerCapture
+        _capture_imports['basler'] = BaslerCapture
+    except ImportError as e:
+        logger.warning(f"BaslerCapture unavailable: {e}")
 
 try:
     from .genicam_capture import GenicamCapture
     _capture_imports['genicam'] = GenicamCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"GenicamCapture unavailable: {e}")
+except ImportError:
+    try:
+        from genicam_capture import GenicamCapture
+        _capture_imports['genicam'] = GenicamCapture
+    except ImportError as e:
+        logger.warning(f"GenicamCapture unavailable: {e}")
 
 try:
     from .realsense_capture import RealsenseCapture
     _capture_imports['realsense'] = RealsenseCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"RealsenseCapture unavailable: {e}")
+except ImportError:
+    try:
+        from realsense_capture import RealsenseCapture
+        _capture_imports['realsense'] = RealsenseCapture
+    except ImportError as e:
+        logger.warning(f"RealsenseCapture unavailable: {e}")
 
 try:
     from .video_file_capture import VideoFileCapture
     _capture_imports['video_file'] = VideoFileCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"VideoFileCapture unavailable: {e}")
+except ImportError:
+    try:
+        from video_file_capture import VideoFileCapture
+        _capture_imports['video_file'] = VideoFileCapture
+    except ImportError as e:
+        logger.warning(f"VideoFileCapture unavailable: {e}")
 
 try:
     from .folder_capture import FolderCapture
     _capture_imports['folder'] = FolderCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"FolderCapture unavailable: {e}")
+except ImportError:
+    try:
+        from folder_capture import FolderCapture
+        _capture_imports['folder'] = FolderCapture
+    except ImportError as e:
+        logger.warning(f"FolderCapture unavailable: {e}")
 
 try:
     from .screen_capture import ScreenCapture
     _capture_imports['screen'] = ScreenCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"ScreenCapture unavailable: {e}")
+except ImportError:
+    try:
+        from screen_capture import ScreenCapture
+        _capture_imports['screen'] = ScreenCapture
+    except ImportError as e:
+        logger.warning(f"ScreenCapture unavailable: {e}")
 
 try:
     from .audiospectrogram_capture import AudioSpectrogramCapture
     _capture_imports['audio_spectrogram'] = AudioSpectrogramCapture
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.warning(f"AudioSpectrogramCapture unavailable: {e}")
+except ImportError:
+    try:
+        from audiospectrogram_capture import AudioSpectrogramCapture
+        _capture_imports['audio_spectrogram'] = AudioSpectrogramCapture
+    except ImportError as e:
+        logger.warning(f"AudioSpectrogramCapture unavailable: {e}")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
 
 
 class FrameSourceFactory:
@@ -112,17 +151,19 @@ class FrameSourceFactory:
         'basler'
     ]
 
-    _capture_types = {
-        'folder': FolderCapture,
-        'video_file': VideoFileCapture,
-        'webcam': WebcamCapture,
-        'ipcam': IPCameraCapture,
-        'basler': BaslerCapture,
-        'realsense': RealsenseCapture,
-        'screen': ScreenCapture,
-        'genicam': GenicamCapture,
-        'audio_spectrogram': AudioSpectrogramCapture
-    }
+    _capture_types: Dict[str, type] = _capture_imports
+
+    # _capture_types = {
+    #     'folder': FolderCapture,
+    #     'video_file': VideoFileCapture,
+    #     'webcam': WebcamCapture,
+    #     'ipcam': IPCameraCapture,
+    #     'basler': BaslerCapture,
+    #     'realsense': RealsenseCapture,
+    #     'screen': ScreenCapture,
+    #     'genicam': GenicamCapture,
+    #     'audio_spectrogram': AudioSpectrogramCapture
+    # }
 
     @classmethod
     def create(cls, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:
@@ -211,3 +252,28 @@ class FrameSourceFactory:
             raise ValueError(f"Capture type '{capture_type}' is not registered")
         del cls._capture_types[capture_type]
         logger.info(f"Unregistered capture type: {capture_type}")
+
+
+if __name__ == "__main__":
+    # Simple test to demonstrate functionality
+    print("FrameSourceFactory Test")
+    print("=" * 80)
+    
+    # Test 1: Import the package
+    print("\n1️⃣ Testing package import...")
+    try:
+        import frame_source
+        print(f"   ✅ Package imported successfully")
+    except Exception as e:
+        print(f"   ❌ Failed: {e}")
+        exit(1)
+    
+    # Test 2: Check FrameSourceFactory available types
+    print("\n2️⃣ Testing FrameSourceFactory available types...")
+    try:
+        from frame_source import FrameSourceFactory
+        available_types = FrameSourceFactory.get_available_types()
+        print(f"   ✅ Available types: {available_types}")
+    except Exception as e:
+        print(f"   ❌ Failed: {e}")
+        exit(1)
