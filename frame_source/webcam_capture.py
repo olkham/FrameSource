@@ -244,15 +244,20 @@ class WebcamCapture(VideoCaptureBase):
             from cv2_enumerate_cameras import enumerate_cameras
             from cv2.videoio_registry import getBackendName
 
+            camera_list = []
             if platform.system() == "Windows":
-                api_preference = (cv2.CAP_DSHOW, cv2.CAP_MSMF)
+                backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF]
             elif platform.system() == "Darwin":  # macOS
-                api_preference = cv2.CAP_AVFOUNDATION
-            else:
-                api_preference = cv2.CAP_V4L2
+                backends = [cv2.CAP_AVFOUNDATION]
+            else:  # Linux
+                backends = [cv2.CAP_V4L2]
 
-            for camera_info in enumerate_cameras(api_preference):
+            for backend in backends:
+                camera_list.extend(enumerate_cameras(backend))
+
+            for camera_info in camera_list:
                 devices.append({"id": f"{camera_info.backend}:{camera_info.index}:{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+            logger.info(f"Found {cls.__name__} input device: {devices}")
             return devices
         except ImportError:
             logger.warning("cv2-enumerate-cameras module not available. Install cv2-enumerate-cameras to list available (web)cameras.")
