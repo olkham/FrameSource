@@ -3,7 +3,15 @@ from typing import Dict, Any
 
 import cv2
 import numpy as np
-import pyrealsense2 as rs
+
+try:
+    import pyrealsense2 as rs
+except ImportError:
+    raise ImportError(
+        "pyrealsense2 is required for RealsenseDepthProcessor. "
+        "Install it with: pip install pyrealsense2"
+    )
+
 from .frame_processor import FrameProcessor, FrameType
 
 class RealsenseProcessingOutput(Enum):

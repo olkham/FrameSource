@@ -17,16 +17,73 @@ Usage:
 from typing import Any
 import logging
 
-from .genicam_capture import GenicamCapture
-from .realsense_capture import RealsenseCapture
 from .video_capture_base import VideoCaptureBase
-from .basler_capture import BaslerCapture
-from .webcam_capture import WebcamCapture
-from .ipcamera_capture import IPCameraCapture
-from .video_file_capture import VideoFileCapture
-from .folder_capture import FolderCapture
-from .screen_capture import ScreenCapture
-from .audiospectrogram_capture import AudioSpectrogramCapture
+
+# Import capture classes with error handling for missing dependencies
+_capture_imports = {}
+
+try:
+    from .webcam_capture import WebcamCapture
+    _capture_imports['webcam'] = WebcamCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"WebcamCapture unavailable: {e}")
+
+try:
+    from .ipcamera_capture import IPCameraCapture
+    _capture_imports['ipcam'] = IPCameraCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"IPCameraCapture unavailable: {e}")
+
+try:
+    from .basler_capture import BaslerCapture
+    _capture_imports['basler'] = BaslerCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"BaslerCapture unavailable: {e}")
+
+try:
+    from .genicam_capture import GenicamCapture
+    _capture_imports['genicam'] = GenicamCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"GenicamCapture unavailable: {e}")
+
+try:
+    from .realsense_capture import RealsenseCapture
+    _capture_imports['realsense'] = RealsenseCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"RealsenseCapture unavailable: {e}")
+
+try:
+    from .video_file_capture import VideoFileCapture
+    _capture_imports['video_file'] = VideoFileCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"VideoFileCapture unavailable: {e}")
+
+try:
+    from .folder_capture import FolderCapture
+    _capture_imports['folder'] = FolderCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"FolderCapture unavailable: {e}")
+
+try:
+    from .screen_capture import ScreenCapture
+    _capture_imports['screen'] = ScreenCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"ScreenCapture unavailable: {e}")
+
+try:
+    from .audiospectrogram_capture import AudioSpectrogramCapture
+    _capture_imports['audio_spectrogram'] = AudioSpectrogramCapture
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"AudioSpectrogramCapture unavailable: {e}")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,17 +93,7 @@ logger = logging.getLogger(__name__)
 class FrameSourceFactory:
     """Factory class for creating video capture instances."""
 
-    _capture_types = {
-        'folder': FolderCapture,
-        'video_file': VideoFileCapture,
-        'webcam': WebcamCapture,
-        'ipcam': IPCameraCapture,
-        'basler': BaslerCapture,
-        'realsense': RealsenseCapture,
-        'screen': ScreenCapture,
-        'genicam': GenicamCapture,
-        'audio_spectrogram': AudioSpectrogramCapture
-    }
+    _capture_types = _capture_imports  # Use dynamically imported classes
     
     @classmethod
     def create(cls, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:

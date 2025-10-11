@@ -2,20 +2,71 @@ from .factory import FrameSourceFactory
 from .threading_utils import simple_frame_producer, FrameProducer, multiprocess_frame_producer, create_producer_consumer_pair
 
 from .video_capture_base import VideoCaptureBase
-from .audiospectrogram_capture import AudioSpectrogramCapture
-from .basler_capture import BaslerCapture
-from .genicam_capture import GenicamCapture
-from .webcam_capture import WebcamCapture
-from .ipcamera_capture import IPCameraCapture
-from .video_file_capture import VideoFileCapture
-from .folder_capture import FolderCapture
-from .realsense_capture import RealsenseCapture
-from .screen_capture import ScreenCapture
+
+# Import capture classes with error handling for missing dependencies
+try:
+    from .webcam_capture import WebcamCapture
+except ImportError as e:
+    WebcamCapture = None
+    print(f"⚠️ WebcamCapture unavailable: {e}")
+
+try:
+    from .audiospectrogram_capture import AudioSpectrogramCapture
+except ImportError as e:
+    AudioSpectrogramCapture = None
+    print(f"⚠️ AudioSpectrogramCapture unavailable: {e}")
+
+try:
+    from .basler_capture import BaslerCapture
+except ImportError as e:
+    BaslerCapture = None
+    print(f"⚠️ BaslerCapture unavailable: {e}")
+
+try:
+    from .genicam_capture import GenicamCapture
+except ImportError as e:
+    GenicamCapture = None
+    print(f"⚠️ GenicamCapture unavailable: {e}")
+
+try:
+    from .ipcamera_capture import IPCameraCapture
+except ImportError as e:
+    IPCameraCapture = None
+    print(f"⚠️ IPCameraCapture unavailable: {e}")
+
+try:
+    from .video_file_capture import VideoFileCapture
+except ImportError as e:
+    VideoFileCapture = None
+    print(f"⚠️ VideoFileCapture unavailable: {e}")
+
+try:
+    from .folder_capture import FolderCapture
+except ImportError as e:
+    FolderCapture = None
+    print(f"⚠️ FolderCapture unavailable: {e}")
+
+try:
+    from .realsense_capture import RealsenseCapture
+except ImportError as e:
+    RealsenseCapture = None
+    print(f"⚠️ RealsenseCapture unavailable: {e}")
+
+try:
+    from .screen_capture import ScreenCapture
+except ImportError as e:
+    ScreenCapture = None
+    print(f"⚠️ ScreenCapture unavailable: {e}")
 
 
 def get_available_sources():
-    """Get list of available frame source types with metadata"""
-    source_metadata = [
+    """Get list of available frame source types with metadata.
+    
+    Dynamically builds the list based on successfully imported capture classes.
+    """
+    # Define all possible sources with their metadata
+    # Only sources with successfully imported classes will be included
+    all_possible_sources = [
         {
             'type': 'webcam',
             'name': 'Webcam',
@@ -90,6 +141,18 @@ def get_available_sources():
         }
     ]
     
+    # Filter to only include sources where the class was successfully imported
+    source_metadata = [
+        source for source in all_possible_sources 
+        if source['class'] is not None
+    ]
+    
+    # Filter to only include sources where the class was successfully imported
+    source_metadata = [
+        source for source in all_possible_sources 
+        if source['class'] is not None
+    ]
+    
     # Get available types from FrameSourceFactory
     available_factory_types = FrameSourceFactory.get_available_types()
     
@@ -101,7 +164,7 @@ def get_available_sources():
         'audio_spectrogram': 'audio_spectrogram'
     }
     
-    # Filter out sources where the class isn't available (import failed)
+    # Build the list of available sources with full metadata
     available_sources = []
     for source in source_metadata:
         try:
@@ -110,7 +173,7 @@ def get_available_sources():
             
             # Check if the factory type is available
             if factory_type in available_factory_types:
-                # Try to create an instance to check if dependencies are available
+                # Try to create an instance to verify dependencies
                 test_instance = FrameSourceFactory.create(factory_type, source='test')
                 
                 # Get configuration schema from the class
@@ -133,7 +196,7 @@ def get_available_sources():
                     'config_schema': config_schema
                 })
             else:
-                # Source type not available in factory
+                # Source class imported but not in factory (shouldn't happen normally)
                 available_sources.append({
                     'type': source['type'],
                     'name': source['name'],
@@ -149,7 +212,7 @@ def get_available_sources():
                 })
                 
         except Exception as e:
-            # Include but mark as unavailable if dependencies are missing
+            # Mark as unavailable if there are runtime issues
             available_sources.append({
                 'type': source['type'],
                 'name': source['name'],
