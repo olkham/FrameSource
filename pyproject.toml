@@ -18,7 +18,8 @@ dependencies = [
     "numpy",
     "mss",
     "numba",
-    "watchdog"
+    "watchdog",
+    "cv2-enumerate-cameras"
 ]
 
 [project.optional-dependencies]
