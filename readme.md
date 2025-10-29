@@ -51,6 +51,23 @@ When I work on computer vision, robotics, or video analytics projects, I often n
 
 ## Installation
 
+### Install Directly from GitHub
+
+You can install FrameSource directly from GitHub without cloning:
+
+```sh
+# Latest version from main branch
+pip install git+https://github.com/olkham/FrameSource.git
+
+# Specific branch
+pip install git+https://github.com/olkham/FrameSource.git@branch-name
+
+# Specific tag or commit
+pip install git+https://github.com/olkham/FrameSource.git@v1.0.0
+```
+
+### Install from Local Clone
+
 Clone the repository and install with pip:
 
 ```sh
@@ -69,6 +86,28 @@ pip install -e .
 
 FrameSource supports optional dependencies for additional features:
 
+**From GitHub:**
+```sh
+# Basic installation (core frame sources only)
+pip install git+https://github.com/olkham/FrameSource.git
+
+# With audio spectrogram support
+pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[audio]"
+
+# With Basler camera support
+pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[basler]"
+
+# With RealSense camera support
+pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[realsense]"
+
+# With all optional features
+pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[full]"
+
+# Multiple extras at once
+pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[audio,basler,realsense]"
+```
+
+**From local installation:**
 ```sh
 # Basic installation (core frame sources only)
 pip install .
