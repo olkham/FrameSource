@@ -165,6 +165,8 @@ class FrameSourceFactory:
     #     'audio_spectrogram': AudioSpectrogramCapture
     # }
 
+    
+
     @classmethod
     def create(cls, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:
         """
@@ -183,16 +185,28 @@ class FrameSourceFactory:
         """
         # If capture_type is not provided, try to get it from kwargs
         if not capture_type:
-            capture_type = kwargs.pop('capture_type', '')
+            capture_type = kwargs.pop('capture_type', None)
         
         if not capture_type or capture_type not in cls._capture_types:
             available_types = ', '.join(cls._capture_types.keys())
             raise ValueError(f"Unsupported capture type: {capture_type}. Available types: {available_types}")
         
-        capture_class = cls._capture_types[capture_type]
-        return capture_class(source=source, **kwargs)
+        if source is None:
+            source = kwargs.pop('source', None)
 
-    
+        if source is None:
+            raise ValueError("Source must be provided to create a capture instance")
+
+        capture_class = cls._capture_types[capture_type]
+        cc = capture_class(source=source, **kwargs)
+
+        connect = kwargs.pop('connect', False)
+
+        if connect:
+            cc.connect()
+
+        return cc
+
     @classmethod
     def register_capture_type(cls, name: str, capture_class: type):
         """

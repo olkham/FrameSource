@@ -237,6 +237,33 @@ class VideoCaptureBase(ABC):
         """Context manager exit."""
         if self.is_connected:
             self.disconnect()
+    
+    def isOpened(self) -> bool:
+        """
+        Check if the capture device is opened/connected.
+        OpenCV-compatible API method.
+        
+        Returns:
+            bool: True if device is connected, False otherwise
+        """
+        return self.is_connected
+    
+    def release(self) -> None:
+        """
+        Release the capture device and stop any background threads.
+        OpenCV-compatible API method that combines disconnect and stop.
+        
+        This method ensures clean shutdown by:
+        1. Stopping background capture threads if running
+        2. Disconnecting from the capture device
+        """
+        # Stop background threads first
+        if hasattr(self, '_capture_thread') and self._capture_thread:
+            self.stop()
+        
+        # Then disconnect from the device
+        if self.is_connected:
+            self.disconnect()
             
     def attach_processor(self, processor):
         """Attach a frame processor to this camera."""
