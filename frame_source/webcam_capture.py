@@ -255,6 +255,9 @@ class WebcamCapture(VideoCaptureBase):
             for backend in backends:
                 camera_list.extend(enumerate_cameras(backend))
 
+            # Sort camera list by index
+            camera_list.sort(key=lambda cam: cam.index)
+
             for camera_info in camera_list:
                 devices.append({"id": f"{camera_info.backend}:{camera_info.index}:{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
             logger.info(f"Found {cls.__name__} input device: {devices}")
