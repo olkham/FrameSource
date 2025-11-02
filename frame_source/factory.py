@@ -195,14 +195,14 @@ class FrameSourceFactory:
             source = kwargs.pop('source', None)
 
         if source is None:
-            raise ValueError("Source must be provided to create a capture instance")
+            Warning("Source not provided, defaulting to 0")
 
         capture_class = cls._capture_types[capture_type]
         cc = capture_class(source=source, **kwargs)
 
         connect = kwargs.pop('connect', False)
 
-        if connect:
+        if connect and source is not None:
             cc.connect()
 
         return cc
