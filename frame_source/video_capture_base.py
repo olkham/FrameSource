@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Any
@@ -265,6 +266,90 @@ class VideoCaptureBase(ABC):
         if self.is_connected:
             self.disconnect()
             
+    def set(self, prop_id: int, value: Any) -> bool:
+        """
+        Set a property of the capture device.
+        OpenCV-compatible API method.
+        
+        Args:
+            prop_id: Property identifier (OpenCV constant)
+            value: Value to set
+        Returns:
+            bool: True if set successfully, False otherwise
+        """
+
+        if prop_id == cv2.CAP_PROP_EXPOSURE:
+            self.set_exposure(value)
+            return True
+        elif prop_id == cv2.CAP_PROP_BRIGHTNESS:
+            return False
+        elif prop_id == cv2.CAP_PROP_CONTRAST:
+            return False
+        elif prop_id == cv2.CAP_PROP_SATURATION:
+            return False
+        elif prop_id == cv2.CAP_PROP_GAIN:
+            self.set_gain(value)
+            return True
+        elif prop_id == cv2.CAP_PROP_FPS:
+            self.set_fps(value)
+            return True
+        elif prop_id == cv2.CAP_PROP_FRAME_WIDTH:
+            size = self.get_frame_size()
+            if size:
+                self.set_frame_size(int(value), size[1])
+                return True
+            else:
+                return False
+        elif prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
+            size = self.get_frame_size()
+            if size:
+                self.set_frame_size(size[0], int(value))
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def get(self, prop_id: int) -> Any:
+        """
+        Get a property of the capture device.
+        OpenCV-compatible API method.
+        
+        Args:
+            prop_id: Property identifier (OpenCV constant)
+        Returns:
+            Any: Property value or None if not available
+        """
+        if prop_id == cv2.CAP_PROP_EXPOSURE:
+            return self.get_exposure()
+        elif prop_id == cv2.CAP_PROP_BRIGHTNESS:
+            # return self.get_brightness()
+            return None
+        elif prop_id == cv2.CAP_PROP_CONTRAST:
+            # return self.get_contrast()
+            return None
+        elif prop_id == cv2.CAP_PROP_SATURATION:
+            # return self.get_saturation()
+            return None
+        elif prop_id == cv2.CAP_PROP_GAIN:
+            return self.get_gain()
+        elif prop_id == cv2.CAP_PROP_FPS:
+            return self.get_fps()
+        elif prop_id == cv2.CAP_PROP_FRAME_WIDTH:
+            size = self.get_frame_size()
+            if size:
+                return size[0]
+            else:
+                return None
+        elif prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
+            size = self.get_frame_size()
+            if size:
+                return size[1]
+            else:
+                return None
+        else:
+            return None
+
     def attach_processor(self, processor):
         """Attach a frame processor to this camera."""
         if not hasattr(self, '_processors'):
