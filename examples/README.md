@@ -41,6 +41,13 @@ This directory contains organized examples for all FrameSource capture types. Ea
 - FPS adjustment
 - Perfect for recording applications
 
+### 6b. **test_window_discovery.py** - Screen Capture with Window Discovery
+- Discover all monitors and windows
+- List windows with screen coordinates
+- Capture specific windows by title search
+- Monitor and window selection
+- Interactive capture mode
+
 ### 7. **ipcamera_example.py** - IP Camera Streaming
 - RTSP and HTTP stream support
 - Automatic reconnection handling

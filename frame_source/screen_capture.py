@@ -17,6 +17,16 @@ except ImportError:
     mss = None
     logging.warning("mss is not installed. Install it with 'pip install mss' to use ScreenCapture.")
 
+try:
+    import win32gui
+    import win32con
+    WINDOWS_AVAILABLE = True
+except ImportError:
+    win32gui = None
+    win32con = None
+    WINDOWS_AVAILABLE = False
+    logging.warning("pywin32 is not installed. Install it with 'pip install pywin32' to discover windows.")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,6 +54,35 @@ class ScreenCapture(VideoCaptureBase):
         self._thread_local = threading.local()
         self.is_connected = False
         self.time_of_last_frame = 0.0
+        self.hwnd = kwargs.get('hwnd', None)  # Optional window handle for tracking
+    
+    @classmethod
+    def from_window(cls, hwnd: int, fps: float = 30.0, **kwargs):
+        """
+        Create a ScreenCapture instance configured to capture a specific window.
+        
+        Args:
+            hwnd: Window handle (from discovery or win32gui)
+            fps: Target frame rate
+            **kwargs: Additional parameters
+        
+        Returns:
+            ScreenCapture: Configured instance
+        """
+        if not WINDOWS_AVAILABLE:
+            raise RuntimeError("Window capture requires pywin32. Install with 'pip install pywin32'")
+        
+        try:
+            rect = win32gui.GetWindowRect(hwnd)
+            left, top, right, bottom = rect
+            width = right - left
+            height = bottom - top
+            
+            instance = cls(x=left, y=top, w=width, h=height, fps=fps, hwnd=hwnd, **kwargs)
+            return instance
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to get window dimensions for hwnd {hwnd}: {e}")
 
     def start_async(self):
         """
@@ -173,37 +212,108 @@ class ScreenCapture(VideoCaptureBase):
     @classmethod
     def discover(cls) -> list:
         """
-        Discover available screen capture sources (monitors/displays).
+        Discover available screen capture sources (monitors/displays and windows).
         
         Returns:
-            list: List of dictionaries containing screen information.
-                Each dict contains: {'index': int, 'name': str, 'width': int, 'height': int, 'left': int, 'top': int}
+            list: List of dictionaries containing screen/window information.
+                Each dict contains: 
+                - For monitors: {'type': 'monitor', 'index': int, 'name': str, 'width': int, 'height': int, 'left': int, 'top': int}
+                - For windows: {'type': 'window', 'hwnd': int, 'name': str, 'title': str, 'width': int, 'height': int, 'left': int, 'top': int, 'is_visible': bool}
         """
         devices = []
         
+        # Discover monitors
         if mss is None:
             logger.warning("mss module not available. Cannot discover screen sources.")
-            return []
-        
-        try:
-            with mss.mss() as sct:
-                # Get all monitors (index 0 is typically all monitors combined)
-                monitors = sct.monitors
-                
-                for i, monitor in enumerate(monitors):
-                    device_data = {
-                        'index': i,
-                        'name': f"Monitor {i}" if i > 0 else "All Monitors",
-                        'width': monitor['width'],
-                        'height': monitor['height'],
-                        'left': monitor['left'],
-                        'top': monitor['top']
-                    }
-                    devices.append(device_data)
-                    logger.info(f"Found screen source: {device_data}")
+        else:
+            try:
+                with mss.mss() as sct:
+                    # Get all monitors (index 0 is typically all monitors combined)
+                    monitors = sct.monitors
                     
-        except Exception as e:
-            logger.error(f"Error discovering screen sources: {e}")
+                    for i, monitor in enumerate(monitors):
+                        device_data = {
+                            'type': 'monitor',
+                            'index': i,
+                            'id': f"monitor_{i}",
+                            'name': f"Monitor {i}" if i > 0 else "All Monitors",
+                            'width': monitor['width'],
+                            'height': monitor['height'],
+                            'left': monitor['left'],
+                            'top': monitor['top']
+                        }
+                        devices.append(device_data)
+                        logger.info(f"Found screen source: {device_data}")
+                        
+            except Exception as e:
+                logger.error(f"Error discovering screen sources: {e}")
+        
+        # Discover windows (Windows OS only)
+        if WINDOWS_AVAILABLE:
+            try:
+                windows = []
+                
+                def window_callback(hwnd, extra):
+                    """Callback function to enumerate windows"""
+                    if not win32gui.IsWindowVisible(hwnd):
+                        return
+                    
+                    # Get window title
+                    title = win32gui.GetWindowText(hwnd)
+                    
+                    # Skip windows without titles or with empty titles
+                    if not title or len(title.strip()) == 0:
+                        return
+                    
+                    # Get window rectangle
+                    try:
+                        rect = win32gui.GetWindowRect(hwnd)
+                        left, top, right, bottom = rect
+                        width = right - left
+                        height = bottom - top
+                        
+                        # Skip windows that are too small (likely not real windows)
+                        if width < 50 or height < 50:
+                            return
+                        
+                        # Get class name for additional context
+                        try:
+                            class_name = win32gui.GetClassName(hwnd)
+                        except:
+                            class_name = "Unknown"
+                        
+                        window_data = {
+                            'type': 'window',
+                            'hwnd': hwnd,
+                            'id': f"window_{hwnd}",
+                            'name': title,
+                            'title': title,
+                            'class_name': class_name,
+                            'width': width,
+                            'height': height,
+                            'left': left,
+                            'top': top,
+                            'is_visible': True
+                        }
+                        windows.append(window_data)
+                        
+                    except Exception as e:
+                        logger.debug(f"Error getting window rect for hwnd {hwnd}: {e}")
+                
+                # Enumerate all windows
+                win32gui.EnumWindows(window_callback, None)
+                
+                # Sort windows by title for consistent ordering
+                windows.sort(key=lambda w: w['title'].lower())
+                
+                # Add windows to devices list
+                devices.extend(windows)
+                logger.info(f"Found {len(windows)} visible windows")
+                
+            except Exception as e:
+                logger.error(f"Error discovering windows: {e}")
+        else:
+            logger.info("Window discovery not available (pywin32 not installed or not on Windows)")
         
         return devices
 
@@ -276,28 +386,47 @@ class ScreenCapture(VideoCaptureBase):
 if __name__ == "__main__":
     # Example usage
     
-    screens = ScreenCapture.discover()
-    print("Discovered screen sources:")
-    for screen in screens:
-        print(f" - {screen['name']} (#{screen['index']}): {screen['width']}x{screen['height']}")
-
+    sources = ScreenCapture.discover()
+    print(f"\nDiscovered {len(sources)} screen capture sources:\n")
+    
+    # Display monitors
+    monitors = [s for s in sources if s.get('type') == 'monitor']
+    if monitors:
+        print(f"Monitors ({len(monitors)}):")
+        for screen in monitors:
+            print(f"  - {screen['name']} (#{screen['index']}): {screen['width']}x{screen['height']} at ({screen['left']}, {screen['top']})")
+    
+    # Display windows
+    windows = [s for s in sources if s.get('type') == 'window']
+    if windows:
+        print(f"\nWindows ({len(windows)}):")
+        for i, window in enumerate(windows[:20]):  # Show first 20 windows
+            print(f"  - {window['title'][:60]:60s} | {window['width']}x{window['height']} at ({window['left']}, {window['top']})")
+        if len(windows) > 20:
+            print(f"  ... and {len(windows) - 20} more windows")
+    
+    print("\n" + "="*80)
+    print("Example: Capture from a specific monitor")
+    print("="*80)
+    
     camera = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
     if camera.connect():
         camera.start_async()
-        print("Webcam connected successfully.")
-        print(f"Exposure: {camera.get_exposure()}")
-        print(f"Gain: {camera.get_gain()}")
+        print("Screen capture connected successfully.")
         print(f"Frame size: {camera.get_frame_size()}")
+        print(f"FPS: {camera.get_fps()}")
         
         # Read a few frames
-        while camera.is_connected:
+        frame_count = 0
+        while camera.is_connected and frame_count < 100:
             ret, frame = camera.read()
             if ret:
-                cv2.imshow("Webcam", frame) # type: ignore
+                cv2.imshow("Screen Capture", frame) # type: ignore
+                frame_count += 1
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
         camera.stop()
         camera.disconnect()
     else:
-        print("Failed to connect to webcam.")
+        print("Failed to connect to screen capture.")
