@@ -700,7 +700,7 @@ class FolderCapture(VideoCaptureBase):
                 {
                     'name': 'source',
                     'label': 'Folder Path',
-                    'type': 'folder',
+                    'type': 'text',
                     'placeholder': 'path/to/image/folder',
                     'description': 'Path to folder containing image files',
                     'required': True
