@@ -73,6 +73,7 @@ def get_available_sources():
             'description': 'Built-in or USB camera',
             'icon': 'fas fa-video',
             'class': WebcamCapture,
+            'has_discovery': WebcamCapture.has_discovery if WebcamCapture else False,
             'primary': True
         },
         {
@@ -81,6 +82,7 @@ def get_available_sources():
             'description': 'Network camera stream',
             'icon': 'fas fa-wifi',
             'class': IPCameraCapture,
+            'has_discovery': IPCameraCapture.has_discovery if IPCameraCapture else False,
             'primary': True
         },
         {
@@ -89,6 +91,7 @@ def get_available_sources():
             'description': 'Industrial camera',
             'icon': 'fas fa-camera',
             'class': BaslerCapture,
+            'has_discovery': BaslerCapture.has_discovery if BaslerCapture else False,
             'primary': True
         },
         {
@@ -97,6 +100,7 @@ def get_available_sources():
             'description': '3D depth camera',
             'icon': 'fas fa-cube',
             'class': RealsenseCapture,
+            'has_discovery': RealsenseCapture.has_discovery if RealsenseCapture else False,
             'primary': True
         },
         {
@@ -105,6 +109,7 @@ def get_available_sources():
             'description': 'Pre-recorded video',
             'icon': 'fas fa-file-video',
             'class': VideoFileCapture,
+            'has_discovery': VideoFileCapture.has_discovery if VideoFileCapture else False,
             'primary': True
         },
         {
@@ -113,6 +118,7 @@ def get_available_sources():
             'description': 'Batch process images',
             'icon': 'fas fa-folder-open',
             'class': FolderCapture,
+            'has_discovery': FolderCapture.has_discovery if FolderCapture else False,
             'primary': True
         },
         {
@@ -121,6 +127,7 @@ def get_available_sources():
             'description': 'Live desktop region',
             'icon': 'fas fa-desktop',
             'class': ScreenCapture,
+            'has_discovery': ScreenCapture.has_discovery if ScreenCapture else False,
             'primary': False
         },
         {
@@ -129,6 +136,7 @@ def get_available_sources():
             'description': 'Real-time audio visualization',
             'icon': 'fas fa-music',
             'class': AudioSpectrogramCapture,
+            'has_discovery': AudioSpectrogramCapture.has_discovery if AudioSpectrogramCapture else False,
             'primary': False
         },
         {
@@ -137,6 +145,7 @@ def get_available_sources():
             'description': 'Generic camera interface',
             'icon': 'fas fa-camera',
             'class': GenicamCapture,
+            'has_discovery': GenicamCapture.has_discovery if GenicamCapture else False,
             'primary': False
         }
     ]
@@ -192,6 +201,7 @@ def get_available_sources():
                     'icon': source['icon'],
                     'primary': source['primary'],
                     'available': True,
+                    'has_discovery': source.get('has_discovery', False),
                     'factory_type': factory_type,
                     'config_schema': config_schema
                 })
@@ -204,6 +214,7 @@ def get_available_sources():
                     'icon': source['icon'],
                     'primary': source['primary'],
                     'available': False,
+                    'has_discovery': source.get('has_discovery', False),
                     'error': f'Source type "{factory_type}" not available in FrameSourceFactory',
                     'config_schema': {
                         'fields': [],
@@ -220,6 +231,7 @@ def get_available_sources():
                 'icon': source['icon'],
                 'primary': source['primary'],
                 'available': False,
+                'has_discovery': source.get('has_discovery', False),
                 'error': str(e),
                 'config_schema': {
                     'fields': [],
