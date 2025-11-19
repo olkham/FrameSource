@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 class BaslerCapture(VideoCaptureBase):
     has_discovery = True
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'serial_number', 'label': 'Serial Number'},
+        {'key': 'device_class', 'label': 'Device Class'},
+        {'key': 'index', 'label': 'Index'}
+    ]
     
     def start_async(self):
         """

@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 class GenicamCapture(VideoCaptureBase):
     has_discovery = True
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'serial_number', 'label': 'Serial Number'},
+        {'key': 'vendor', 'label': 'Vendor'},
+        {'key': 'index', 'label': 'Index'}
+    ]
     
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:

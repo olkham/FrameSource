@@ -19,7 +19,9 @@ dependencies = [
     "mss",
     "numba",
     "watchdog",
-    "cv2-enumerate-cameras"
+    "cv2-enumerate-cameras",
+    "pywin32; platform_system=='Windows'",
+    "pyobjc-framework-Quartz; platform_system=='Darwin'"
 ]
 
 [project.optional-dependencies]

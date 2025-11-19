@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 class RealsenseCapture(VideoCaptureBase):
     has_discovery = True
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'serial_number', 'label': 'Serial Number'},
+        {'key': 'product_line', 'label': 'Product Line'},
+        {'key': 'index', 'label': 'Index'}
+    ]
     
     def start_async(self):
         """

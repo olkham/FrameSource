@@ -17,6 +17,10 @@ except ImportError:
     mss = None
     logging.warning("mss is not installed. Install it with 'pip install mss' to use ScreenCapture.")
 
+import platform
+SYSTEM = platform.system()
+
+# Windows support
 try:
     import win32gui
     import win32con
@@ -25,7 +29,39 @@ except ImportError:
     win32gui = None
     win32con = None
     WINDOWS_AVAILABLE = False
-    logging.warning("pywin32 is not installed. Install it with 'pip install pywin32' to discover windows.")
+    if SYSTEM == 'Windows':
+        logging.warning("pywin32 is not installed. Install it with 'pip install pywin32' to discover windows.")
+
+# macOS support
+try:
+    if SYSTEM == 'Darwin':
+        from Quartz import (
+            CGWindowListCopyWindowInfo,
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID,
+            kCGWindowLayer,
+            kCGWindowName,
+            kCGWindowOwnerName,
+            kCGWindowBounds,
+            kCGWindowNumber
+        )
+        MACOS_AVAILABLE = True
+    else:
+        MACOS_AVAILABLE = False
+except ImportError:
+    MACOS_AVAILABLE = False
+    if SYSTEM == 'Darwin':
+        logging.warning("pyobjc-framework-Quartz is not installed. Install it with 'pip install pyobjc-framework-Quartz' to discover windows on macOS.")
+
+# Linux support
+try:
+    if SYSTEM == 'Linux':
+        import subprocess
+        LINUX_AVAILABLE = True
+    else:
+        LINUX_AVAILABLE = False
+except ImportError:
+    LINUX_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +78,15 @@ class ScreenCapture(VideoCaptureBase):
         fps (float): Target FPS (default 30)
     """
     has_discovery = True
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'type', 'label': 'Type'},
+        {'key': 'title', 'label': 'Title'},
+        {'key': 'width', 'label': 'Width'},
+        {'key': 'height', 'label': 'Height'},
+        {'key': 'left', 'label': 'X'},
+        {'key': 'top', 'label': 'Y'}
+    ]
     
     def __init__(self, x: int = 0, y: int = 0, w: int = 640, h: int = 480, fps: float = 30.0, **kwargs):
         super().__init__(**kwargs)
@@ -57,32 +102,118 @@ class ScreenCapture(VideoCaptureBase):
         self.hwnd = kwargs.get('hwnd', None)  # Optional window handle for tracking
     
     @classmethod
-    def from_window(cls, hwnd: int, fps: float = 30.0, **kwargs):
+    def from_window(cls, window_id: Any, fps: float = 30.0, **kwargs):
         """
         Create a ScreenCapture instance configured to capture a specific window.
         
         Args:
-            hwnd: Window handle (from discovery or win32gui)
+            window_id: Window identifier (hwnd on Windows, window number on macOS, window ID on Linux)
             fps: Target frame rate
             **kwargs: Additional parameters
         
         Returns:
             ScreenCapture: Configured instance
         """
-        if not WINDOWS_AVAILABLE:
-            raise RuntimeError("Window capture requires pywin32. Install with 'pip install pywin32'")
+        if SYSTEM == 'Windows':
+            if not WINDOWS_AVAILABLE:
+                raise RuntimeError("Window capture requires pywin32. Install with 'pip install pywin32'")
+            
+            try:
+                rect = win32gui.GetWindowRect(window_id)
+                left, top, right, bottom = rect
+                width = right - left
+                height = bottom - top
+                
+                instance = cls(x=left, y=top, w=width, h=height, fps=fps, hwnd=window_id, **kwargs)
+                return instance
+                
+            except Exception as e:
+                raise RuntimeError(f"Failed to get window dimensions for hwnd {window_id}: {e}")
         
-        try:
-            rect = win32gui.GetWindowRect(hwnd)
-            left, top, right, bottom = rect
-            width = right - left
-            height = bottom - top
+        elif SYSTEM == 'Darwin':
+            if not MACOS_AVAILABLE:
+                raise RuntimeError("Window capture requires pyobjc-framework-Quartz. Install with 'pip install pyobjc-framework-Quartz'")
             
-            instance = cls(x=left, y=top, w=width, h=height, fps=fps, hwnd=hwnd, **kwargs)
-            return instance
+            try:
+                # Get window info
+                window_list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
+                for window in window_list:
+                    if window.get(kCGWindowNumber) == window_id:
+                        bounds = window.get(kCGWindowBounds)
+                        left = int(bounds['X'])
+                        top = int(bounds['Y'])
+                        width = int(bounds['Width'])
+                        height = int(bounds['Height'])
+                        
+                        instance = cls(x=left, y=top, w=width, h=height, fps=fps, hwnd=window_id, **kwargs)
+                        return instance
+                
+                raise RuntimeError(f"Window {window_id} not found")
+                
+            except Exception as e:
+                raise RuntimeError(f"Failed to get window dimensions for window {window_id}: {e}")
+        
+        elif SYSTEM == 'Linux':
+            if not LINUX_AVAILABLE:
+                raise RuntimeError("Window capture requires wmctrl or xdotool")
             
-        except Exception as e:
-            raise RuntimeError(f"Failed to get window dimensions for hwnd {hwnd}: {e}")
+            try:
+                # Try to get window geometry using xdotool
+                result = subprocess.run(
+                    ['xdotool', 'getwindowgeometry', '--shell', str(window_id)],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                # Parse output
+                geometry = {}
+                for line in result.stdout.strip().split('\n'):
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        geometry[key] = int(value)
+                
+                left = geometry.get('X', 0)
+                top = geometry.get('Y', 0)
+                width = geometry.get('WIDTH', 640)
+                height = geometry.get('HEIGHT', 480)
+                
+                instance = cls(x=left, y=top, w=width, h=height, fps=fps, hwnd=window_id, **kwargs)
+                return instance
+                
+            except subprocess.CalledProcessError:
+                # Try wmctrl as fallback
+                try:
+                    result = subprocess.run(
+                        ['wmctrl', '-lG'],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    
+                    for line in result.stdout.strip().split('\n'):
+                        parts = line.split(None, 7)
+                        if len(parts) >= 7:
+                            win_id = parts[0]
+                            if win_id == hex(window_id) or win_id == str(window_id):
+                                left = int(parts[2])
+                                top = int(parts[3])
+                                width = int(parts[4])
+                                height = int(parts[5])
+                                
+                                instance = cls(x=left, y=top, w=width, h=height, fps=fps, hwnd=window_id, **kwargs)
+                                return instance
+                    
+                    raise RuntimeError(f"Window {window_id} not found in wmctrl output")
+                    
+                except Exception as e:
+                    raise RuntimeError(f"Failed to get window dimensions using wmctrl: {e}")
+            
+            except Exception as e:
+                raise RuntimeError(f"Failed to get window dimensions for window {window_id}: {e}")
+        
+        else:
+            raise RuntimeError(f"Window capture not supported on {SYSTEM}")
 
     def start_async(self):
         """
@@ -218,7 +349,7 @@ class ScreenCapture(VideoCaptureBase):
             list: List of dictionaries containing screen/window information.
                 Each dict contains: 
                 - For monitors: {'type': 'monitor', 'index': int, 'name': str, 'width': int, 'height': int, 'left': int, 'top': int}
-                - For windows: {'type': 'window', 'hwnd': int, 'name': str, 'title': str, 'width': int, 'height': int, 'left': int, 'top': int, 'is_visible': bool}
+                - For windows: {'type': 'window', 'id': str/int, 'name': str, 'title': str, 'width': int, 'height': int, 'left': int, 'top': int, 'is_visible': bool}
         """
         devices = []
         
@@ -248,47 +379,280 @@ class ScreenCapture(VideoCaptureBase):
             except Exception as e:
                 logger.error(f"Error discovering screen sources: {e}")
         
-        # Discover windows (Windows OS only)
-        if WINDOWS_AVAILABLE:
-            try:
-                windows = []
+        # Discover windows - platform specific
+        if SYSTEM == 'Windows':
+            devices.extend(cls._discover_windows_windows())
+        elif SYSTEM == 'Darwin':
+            devices.extend(cls._discover_windows_macos())
+        elif SYSTEM == 'Linux':
+            devices.extend(cls._discover_windows_linux())
+        else:
+            logger.info(f"Window discovery not supported on {SYSTEM}")
+        
+        return devices
+    
+    @classmethod
+    def _discover_windows_windows(cls) -> list:
+        """Discover windows on Windows using win32gui."""
+        if not WINDOWS_AVAILABLE:
+            logger.info("Window discovery not available (pywin32 not installed)")
+            return []
+        
+        windows = []
+        
+        try:
+            def window_callback(hwnd, extra):
+                """Callback function to enumerate windows"""
+                if not win32gui.IsWindowVisible(hwnd):
+                    return
                 
-                def window_callback(hwnd, extra):
-                    """Callback function to enumerate windows"""
-                    if not win32gui.IsWindowVisible(hwnd):
+                # Get window title
+                title = win32gui.GetWindowText(hwnd)
+                
+                # Skip windows without titles or with empty titles
+                if not title or len(title.strip()) == 0:
+                    return
+                
+                # Get window rectangle
+                try:
+                    rect = win32gui.GetWindowRect(hwnd)
+                    left, top, right, bottom = rect
+                    width = right - left
+                    height = bottom - top
+                    
+                    # Skip windows that are too small (likely not real windows)
+                    if width < 50 or height < 50:
                         return
                     
-                    # Get window title
-                    title = win32gui.GetWindowText(hwnd)
-                    
-                    # Skip windows without titles or with empty titles
-                    if not title or len(title.strip()) == 0:
-                        return
-                    
-                    # Get window rectangle
+                    # Get class name for additional context
                     try:
-                        rect = win32gui.GetWindowRect(hwnd)
-                        left, top, right, bottom = rect
-                        width = right - left
-                        height = bottom - top
+                        class_name = win32gui.GetClassName(hwnd)
+                    except:
+                        class_name = "Unknown"
+                    
+                    window_data = {
+                        'type': 'window',
+                        'hwnd': hwnd,
+                        'id': f"window_{hwnd}",
+                        'name': title,
+                        'title': title,
+                        'class_name': class_name,
+                        'width': width,
+                        'height': height,
+                        'left': left,
+                        'top': top,
+                        'is_visible': True
+                    }
+                    windows.append(window_data)
+                    
+                except Exception as e:
+                    logger.debug(f"Error getting window rect for hwnd {hwnd}: {e}")
+            
+            # Enumerate all windows
+            win32gui.EnumWindows(window_callback, None)
+            
+            # Sort windows by title for consistent ordering
+            windows.sort(key=lambda w: w['title'].lower())
+            
+            logger.info(f"Found {len(windows)} visible windows")
+            
+        except Exception as e:
+            logger.error(f"Error discovering windows: {e}")
+        
+        return windows
+    
+    @classmethod
+    def _discover_windows_macos(cls) -> list:
+        """Discover windows on macOS using Quartz."""
+        if not MACOS_AVAILABLE:
+            logger.info("Window discovery not available (pyobjc-framework-Quartz not installed)")
+            return []
+        
+        windows = []
+        
+        try:
+            # Get list of all on-screen windows
+            window_list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
+            
+            for window in window_list:
+                # Get window properties
+                window_layer = window.get(kCGWindowLayer, 0)
+                
+                # Skip desktop and other background windows (layer > 0)
+                if window_layer != 0:
+                    continue
+                
+                window_name = window.get(kCGWindowName, '')
+                owner_name = window.get(kCGWindowOwnerName, '')
+                window_number = window.get(kCGWindowNumber, 0)
+                bounds = window.get(kCGWindowBounds, {})
+                
+                # Skip windows without names
+                if not window_name or len(window_name.strip()) == 0:
+                    continue
+                
+                # Get dimensions
+                left = int(bounds.get('X', 0))
+                top = int(bounds.get('Y', 0))
+                width = int(bounds.get('Width', 0))
+                height = int(bounds.get('Height', 0))
+                
+                # Skip windows that are too small
+                if width < 50 or height < 50:
+                    continue
+                
+                window_data = {
+                    'type': 'window',
+                    'window_number': window_number,
+                    'id': f"window_{window_number}",
+                    'name': window_name,
+                    'title': window_name,
+                    'owner': owner_name,
+                    'width': width,
+                    'height': height,
+                    'left': left,
+                    'top': top,
+                    'is_visible': True
+                }
+                windows.append(window_data)
+            
+            # Sort windows by title for consistent ordering
+            windows.sort(key=lambda w: w['title'].lower())
+            
+            logger.info(f"Found {len(windows)} visible windows")
+            
+        except Exception as e:
+            logger.error(f"Error discovering windows on macOS: {e}")
+        
+        return windows
+    
+    @classmethod
+    def _discover_windows_linux(cls) -> list:
+        """Discover windows on Linux using wmctrl or xdotool."""
+        if not LINUX_AVAILABLE:
+            return []
+        
+        windows = []
+        
+        # Try wmctrl first (more reliable)
+        try:
+            result = subprocess.run(
+                ['wmctrl', '-lGp'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            for line in result.stdout.strip().split('\n'):
+                parts = line.split(None, 8)
+                if len(parts) >= 9:
+                    win_id = parts[0]
+                    desktop = parts[1]
+                    pid = parts[2]
+                    left = int(parts[3])
+                    top = int(parts[4])
+                    width = int(parts[5])
+                    height = int(parts[6])
+                    hostname = parts[7]
+                    title = parts[8] if len(parts) > 8 else ""
+                    
+                    # Skip windows without titles
+                    if not title or len(title.strip()) == 0:
+                        continue
+                    
+                    # Skip windows that are too small
+                    if width < 50 or height < 50:
+                        continue
+                    
+                    # Convert hex window ID to int
+                    try:
+                        window_id_int = int(win_id, 16)
+                    except:
+                        window_id_int = win_id
+                    
+                    window_data = {
+                        'type': 'window',
+                        'window_id': window_id_int,
+                        'id': f"window_{win_id}",
+                        'name': title,
+                        'title': title,
+                        'desktop': desktop,
+                        'pid': pid,
+                        'width': width,
+                        'height': height,
+                        'left': left,
+                        'top': top,
+                        'is_visible': True
+                    }
+                    windows.append(window_data)
+            
+            # Sort windows by title for consistent ordering
+            windows.sort(key=lambda w: w['title'].lower())
+            
+            logger.info(f"Found {len(windows)} visible windows using wmctrl")
+            
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Try xdotool as fallback
+            try:
+                result = subprocess.run(
+                    ['xdotool', 'search', '--onlyvisible', '--name', '.*'],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                window_ids = result.stdout.strip().split('\n')
+                
+                for win_id in window_ids:
+                    if not win_id:
+                        continue
+                    
+                    try:
+                        # Get window name
+                        name_result = subprocess.run(
+                            ['xdotool', 'getwindowname', win_id],
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        title = name_result.stdout.strip()
                         
-                        # Skip windows that are too small (likely not real windows)
+                        if not title or len(title.strip()) == 0:
+                            continue
+                        
+                        # Get window geometry
+                        geom_result = subprocess.run(
+                            ['xdotool', 'getwindowgeometry', '--shell', win_id],
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        
+                        # Parse geometry
+                        geometry = {}
+                        for line in geom_result.stdout.strip().split('\n'):
+                            if '=' in line:
+                                key, value = line.split('=', 1)
+                                try:
+                                    geometry[key] = int(value)
+                                except:
+                                    geometry[key] = value
+                        
+                        left = geometry.get('X', 0)
+                        top = geometry.get('Y', 0)
+                        width = geometry.get('WIDTH', 0)
+                        height = geometry.get('HEIGHT', 0)
+                        
+                        # Skip windows that are too small
                         if width < 50 or height < 50:
-                            return
-                        
-                        # Get class name for additional context
-                        try:
-                            class_name = win32gui.GetClassName(hwnd)
-                        except:
-                            class_name = "Unknown"
+                            continue
                         
                         window_data = {
                             'type': 'window',
-                            'hwnd': hwnd,
-                            'id': f"window_{hwnd}",
+                            'window_id': int(win_id),
+                            'id': f"window_{win_id}",
                             'name': title,
                             'title': title,
-                            'class_name': class_name,
                             'width': width,
                             'height': height,
                             'left': left,
@@ -298,24 +662,18 @@ class ScreenCapture(VideoCaptureBase):
                         windows.append(window_data)
                         
                     except Exception as e:
-                        logger.debug(f"Error getting window rect for hwnd {hwnd}: {e}")
-                
-                # Enumerate all windows
-                win32gui.EnumWindows(window_callback, None)
+                        logger.debug(f"Error getting info for window {win_id}: {e}")
+                        continue
                 
                 # Sort windows by title for consistent ordering
                 windows.sort(key=lambda w: w['title'].lower())
                 
-                # Add windows to devices list
-                devices.extend(windows)
-                logger.info(f"Found {len(windows)} visible windows")
+                logger.info(f"Found {len(windows)} visible windows using xdotool")
                 
-            except Exception as e:
-                logger.error(f"Error discovering windows: {e}")
-        else:
-            logger.info("Window discovery not available (pywin32 not installed or not on Windows)")
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                logger.warning("Neither wmctrl nor xdotool available. Install one to discover windows on Linux.")
         
-        return devices
+        return windows
 
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:

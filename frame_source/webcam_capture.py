@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 class WebcamCapture(VideoCaptureBase):
     has_discovery = True
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'index', 'label': 'Index'},
+        {'key': 'backend_name', 'label': 'Backend'}
+    ]
     
     def start_async(self):
         """

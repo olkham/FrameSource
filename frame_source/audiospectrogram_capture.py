@@ -31,6 +31,12 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     Audio spectrogram capture implementation.
     """
     has_discovery = True
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'index', 'label': 'Index'},
+        {'key': 'channels', 'label': 'Channels'},
+        {'key': 'sample_rate', 'label': 'Sample Rate'}
+    ]
     """
     Capture audio spectrograms as video frames from microphones or audio files.
     Treats spectrograms as visual data that can be processed like regular video frames.

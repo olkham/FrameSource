@@ -74,6 +74,7 @@ def get_available_sources():
             'icon': 'fas fa-video',
             'class': WebcamCapture,
             'has_discovery': WebcamCapture.has_discovery if WebcamCapture else False,
+            'display_fields': WebcamCapture.display_fields if WebcamCapture else [],
             'primary': True
         },
         {
@@ -83,6 +84,7 @@ def get_available_sources():
             'icon': 'fas fa-wifi',
             'class': IPCameraCapture,
             'has_discovery': IPCameraCapture.has_discovery if IPCameraCapture else False,
+            'display_fields': IPCameraCapture.display_fields if IPCameraCapture else [],
             'primary': True
         },
         {
@@ -92,6 +94,7 @@ def get_available_sources():
             'icon': 'fas fa-camera',
             'class': BaslerCapture,
             'has_discovery': BaslerCapture.has_discovery if BaslerCapture else False,
+            'display_fields': BaslerCapture.display_fields if BaslerCapture else [],
             'primary': True
         },
         {
@@ -101,6 +104,7 @@ def get_available_sources():
             'icon': 'fas fa-cube',
             'class': RealsenseCapture,
             'has_discovery': RealsenseCapture.has_discovery if RealsenseCapture else False,
+            'display_fields': RealsenseCapture.display_fields if RealsenseCapture else [],
             'primary': True
         },
         {
@@ -110,6 +114,7 @@ def get_available_sources():
             'icon': 'fas fa-file-video',
             'class': VideoFileCapture,
             'has_discovery': VideoFileCapture.has_discovery if VideoFileCapture else False,
+            'display_fields': VideoFileCapture.display_fields if VideoFileCapture else [],
             'primary': True
         },
         {
@@ -119,6 +124,7 @@ def get_available_sources():
             'icon': 'fas fa-folder-open',
             'class': FolderCapture,
             'has_discovery': FolderCapture.has_discovery if FolderCapture else False,
+            'display_fields': FolderCapture.display_fields if FolderCapture else [],
             'primary': True
         },
         {
@@ -128,6 +134,7 @@ def get_available_sources():
             'icon': 'fas fa-desktop',
             'class': ScreenCapture,
             'has_discovery': ScreenCapture.has_discovery if ScreenCapture else False,
+            'display_fields': ScreenCapture.display_fields if ScreenCapture else [],
             'primary': False
         },
         {
@@ -137,6 +144,7 @@ def get_available_sources():
             'icon': 'fas fa-music',
             'class': AudioSpectrogramCapture,
             'has_discovery': AudioSpectrogramCapture.has_discovery if AudioSpectrogramCapture else False,
+            'display_fields': AudioSpectrogramCapture.display_fields if AudioSpectrogramCapture else [],
             'primary': False
         },
         {
@@ -146,6 +154,7 @@ def get_available_sources():
             'icon': 'fas fa-camera',
             'class': GenicamCapture,
             'has_discovery': GenicamCapture.has_discovery if GenicamCapture else False,
+            'display_fields': GenicamCapture.display_fields if GenicamCapture else [],
             'primary': False
         }
     ]
@@ -202,6 +211,7 @@ def get_available_sources():
                     'primary': source['primary'],
                     'available': True,
                     'has_discovery': source.get('has_discovery', False),
+                    'display_fields': source.get('display_fields', []),
                     'factory_type': factory_type,
                     'config_schema': config_schema
                 })
@@ -215,6 +225,7 @@ def get_available_sources():
                     'primary': source['primary'],
                     'available': False,
                     'has_discovery': source.get('has_discovery', False),
+                    'display_fields': source.get('display_fields', []),
                     'error': f'Source type "{factory_type}" not available in FrameSourceFactory',
                     'config_schema': {
                         'fields': [],
@@ -232,6 +243,7 @@ def get_available_sources():
                 'primary': source['primary'],
                 'available': False,
                 'has_discovery': source.get('has_discovery', False),
+                'display_fields': source.get('display_fields', []),
                 'error': str(e),
                 'config_schema': {
                     'fields': [],

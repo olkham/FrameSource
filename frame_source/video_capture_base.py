@@ -7,6 +7,13 @@ class VideoCaptureBase(ABC):
     # Class attribute indicating if this capture type supports device discovery
     has_discovery = False
     
+    # Class attribute defining which fields to display when showing discovered devices
+    # Subclasses should override this with their specific fields
+    display_fields = [
+        {'key': 'name', 'label': 'Name'},
+        {'key': 'id', 'label': 'ID'}
+    ]
+    
     def start_async(self):
         """
         Start background frame capture in a separate thread.
