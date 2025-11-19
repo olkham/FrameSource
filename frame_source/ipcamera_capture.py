@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class IPCameraCapture(VideoCaptureBase):
+    has_discovery = False  # Requires manual URL/credential configuration
+    
     def start_async(self):
         """
         Start background thread to continuously capture frames from IP camera.

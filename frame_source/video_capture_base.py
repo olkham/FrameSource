@@ -4,6 +4,9 @@ from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Any
 
 class VideoCaptureBase(ABC):
+    # Class attribute indicating if this capture type supports device discovery
+    has_discovery = False
+    
     def start_async(self):
         """
         Start background frame capture in a separate thread.

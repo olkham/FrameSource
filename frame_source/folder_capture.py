@@ -134,6 +134,8 @@ class FolderCapture(VideoCaptureBase):
     Images can be sorted by creation time or by name.
     Supports automatic folder monitoring to detect new/removed images.
     """
+    has_discovery = False  # Uses folder paths, not discoverable devices
+    
     def __init__(self, source: str, sort_by: str = 'name', width: Optional[int] = None, height: Optional[int] = None, fps: float = 30.0, real_time: bool = True, loop: bool = False, watch_folder: bool = True, **kwargs):
         super().__init__(source, **kwargs)
         self.sort_by = sort_by
@@ -775,8 +777,11 @@ class FolderCapture(VideoCaptureBase):
             ]
         }
 
+
+
+
 # Standalone test code
-if __name__ == "__main__":
+def _test_folder_capture():
     import sys
     
     # Use command line argument for folder path, or default to a test folder
@@ -892,3 +897,7 @@ if __name__ == "__main__":
     else:
         print(f"Failed to connect to folder: {folder}")
         print("Make sure the folder exists and contains image files (.jpg, .jpeg, .png, .bmp, .tiff, .tif)")
+
+
+if __name__ == "__main__":
+    _test_folder_capture()

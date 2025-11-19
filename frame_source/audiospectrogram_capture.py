@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 
 class AudioSpectrogramCapture(VideoCaptureBase):
     """
+    Audio spectrogram capture implementation.
+    """
+    has_discovery = True
+    """
     Capture audio spectrograms as video frames from microphones or audio files.
     Treats spectrograms as visual data that can be processed like regular video frames.
     """

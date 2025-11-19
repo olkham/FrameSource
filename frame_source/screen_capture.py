@@ -31,6 +31,8 @@ class ScreenCapture(VideoCaptureBase):
         h (int): Height of region
         fps (float): Target FPS (default 30)
     """
+    has_discovery = True
+    
     def __init__(self, x: int = 0, y: int = 0, w: int = 640, h: int = 480, fps: float = 30.0, **kwargs):
         super().__init__(**kwargs)
         self.x = x

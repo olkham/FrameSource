@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class RealsenseCapture(VideoCaptureBase):
+    has_discovery = True
+    
     def start_async(self):
         """
         Start background thread to continuously capture frames from realsense camera.

@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class GenicamCapture(VideoCaptureBase):
+    has_discovery = True
+    
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for GenICam capture"""

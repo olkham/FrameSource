@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class VideoFileCapture(VideoCaptureBase):
+    has_discovery = False  # Uses file paths, not discoverable devices
+    
     def start_async(self):
         """
         Start background thread to continuously capture frames from video file.
