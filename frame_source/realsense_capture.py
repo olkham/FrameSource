@@ -191,8 +191,10 @@ class RealsenseCapture(VideoCaptureBase):
             height = self.h if self.h > 0 else self._max_height
             fps = self.fps if self.fps > 0 else self._max_fps
 
-            config.enable_stream(rs.stream.depth, width, height, rs.format.z16, fps)
-            config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, fps)
+            # Enable depth stream without specifying resolution - let it auto-select
+            # (depth sensor often has different max resolution than color sensor)
+            config.enable_stream(rs.stream.depth, rs.format.z16, int(fps))
+            config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, int(fps))
 
             # Start streaming
             self.profile = self.pipeline.start(config)
@@ -522,7 +524,7 @@ if __name__ == "__main__":
     # Example usage
     camera = RealsenseCapture(source=0)
     if camera.connect():
-        camera.start_async()
+        # camera.start_async()
         print("Realsense camera connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
