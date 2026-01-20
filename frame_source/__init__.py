@@ -58,6 +58,12 @@ except ImportError as e:
     ScreenCapture = None
     print(f"⚠️ ScreenCapture unavailable: {e}")
 
+try:
+    from .ximea_capture import XimeaCapture
+except ImportError as e:
+    XimeaCapture = None
+    print(f"⚠️ XimeaCapture unavailable: {e}")
+
 
 def get_available_sources():
     """Get list of available frame source types with metadata.
@@ -75,6 +81,16 @@ def get_available_sources():
             'class': WebcamCapture,
             'has_discovery': WebcamCapture.has_discovery if WebcamCapture else False,
             'display_fields': WebcamCapture.display_fields if WebcamCapture else [],
+            'primary': True
+        },
+        {
+            'type': 'ximea',
+            'name': 'Ximea',
+            'description': 'High-speed camera',
+            'icon': 'fas fa-camera-retro',
+            'class': XimeaCapture,
+            'has_discovery': XimeaCapture.has_discovery if XimeaCapture else False,
+            'display_fields': XimeaCapture.display_fields if XimeaCapture else [],
             'primary': True
         },
         {

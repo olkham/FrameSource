@@ -127,7 +127,15 @@ except ImportError:
         logger.warning(f"AudioSpectrogramCapture unavailable: {e}")
 
 
-
+try:
+    from .ximea_capture import XimeaCapture
+    _capture_imports['ximea'] = XimeaCapture
+except ImportError:
+    try:
+        from ximea_capture import XimeaCapture
+        _capture_imports['ximea'] = XimeaCapture
+    except ImportError as e:
+        logger.warning(f"XimeaCapture unavailable: {e}")
 
 class FrameSourceFactory:
     """Factory class for creating video capture instances."""
@@ -141,7 +149,8 @@ class FrameSourceFactory:
         'realsense',
         'screen',
         'genicam',
-        'audio_spectrogram'
+        'audio_spectrogram',
+        'ximea'
     ]
 
     CameraSource = Literal[
