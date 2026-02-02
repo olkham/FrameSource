@@ -6,6 +6,7 @@ types of image transformations and manipulations.
 
 from .frame_processor import FrameProcessor
 from .equirectangular360_processor import Equirectangular2PinholeProcessor
+from .fisheye2equirectangular_processor import Fisheye2EquirectangularProcessor
 
 # Conditionally import RealsenseDepthProcessor if pyrealsense2 is available
 try:
@@ -13,6 +14,7 @@ try:
     __all__ = [
         'FrameProcessor',
         'Equirectangular2PinholeProcessor',
+        'Fisheye2EquirectangularProcessor',
         'RealsenseDepthProcessor'
     ]
 except ImportError:
@@ -20,4 +22,5 @@ except ImportError:
     __all__ = [
         'FrameProcessor',
         'Equirectangular2PinholeProcessor',
+        'Fisheye2EquirectangularProcessor',
     ]
