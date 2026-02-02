@@ -79,7 +79,7 @@ def main():
 
     # Try to connect to a fisheye camera (webcam source 0)
     # For testing, you can also use a fisheye image/video file
-    camera = FrameSourceFactory.create('webcam', source=0, threaded=True)
+    camera = FrameSourceFactory.create('ximea', source=0, threaded=True)
 
     if not camera.connect():
         print("No camera found. Creating a synthetic fisheye test pattern...")
@@ -129,8 +129,8 @@ def main():
 
     # Create fisheye to equirectangular processor
     fisheye_processor = Fisheye2EquirectangularProcessor(
-        output_width=1920,
-        output_height=960  # Standard 2:1 equirectangular aspect ratio
+        output_width=1280,
+        output_height=640  # Standard 2:1 equirectangular aspect ratio
     )
 
     # Create equirectangular to pinhole processor for PTZ control
@@ -146,7 +146,7 @@ def main():
     pinhole_processor.set_parameter('roll', 0.0)
 
     # Set up mouse callback
-    mouse_params = {'frame_width': 1920, 'frame_height': 960}
+    mouse_params = {'frame_width': 1280, 'frame_height': 640}
     cv2.setMouseCallback("Equirectangular", mouse_callback, mouse_params)
 
     def print_help():
