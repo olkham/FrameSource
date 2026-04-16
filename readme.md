@@ -84,6 +84,7 @@ pip install -e .
 
 ### Installation Options
 
+
 FrameSource supports optional dependencies for additional features:
 
 **From GitHub:**
@@ -92,19 +93,19 @@ FrameSource supports optional dependencies for additional features:
 pip install git+https://github.com/olkham/FrameSource.git
 
 # With audio spectrogram support
-pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[audio]"
+pip install "framesource[audio] @ git+https://github.com/olkham/FrameSource.git"
 
 # With Basler camera support
-pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[basler]"
+pip install "framesource[basler] @ git+https://github.com/olkham/FrameSource.git"
 
 # With RealSense camera support
-pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[realsense]"
+pip install "framesource[realsense] @ git+https://github.com/olkham/FrameSource.git"
 
 # With all optional features
-pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[full]"
+pip install "framesource[full] @ git+https://github.com/olkham/FrameSource.git"
 
 # Multiple extras at once
-pip install "git+https://github.com/olkham/FrameSource.git#egg=framesource[audio,basler,realsense]"
+pip install "framesource[audio,basler,realsense] @ git+https://github.com/olkham/FrameSource.git"
 ```
 
 **From local installation:**
