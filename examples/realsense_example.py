@@ -7,8 +7,8 @@ Shows RGB, depth, and aligned views.
 """
 
 import cv2
-from frame_source.realsense_capture import RealsenseCapture
-from frame_processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
+from framesource.sources.realsense_capture import RealsenseCapture
+from framesource.processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
 
 
 def main():

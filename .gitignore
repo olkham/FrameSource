@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# setuptools_scm generated version file
+src/framesource/_version.py
+
 # C extensions
 *.so
 
@@ -30,10 +33,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.cvpr_env/
-.cvpr_env*/
-.cvpr_env\
-.cvpr_env*/
+.venv/
+.github/
+
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

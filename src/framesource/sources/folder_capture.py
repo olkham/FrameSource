@@ -12,7 +12,7 @@ except ImportError:
     # For standalone testing, add parent directory to path
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from frame_source.video_capture_base import VideoCaptureBase
+    from framesource.sources.video_capture_base import VideoCaptureBase
 
 import logging
 

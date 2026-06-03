@@ -11,8 +11,8 @@ This enables pan/tilt/zoom control over a fisheye camera feed.
 
 import cv2
 import numpy as np
-from frame_source import FrameSourceFactory
-from frame_processors import Fisheye2EquirectangularProcessor, Equirectangular2PinholeProcessor
+from framesource import FrameSourceFactory
+from framesource.processors import Fisheye2EquirectangularProcessor, Equirectangular2PinholeProcessor
 
 
 def main():

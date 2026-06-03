@@ -2,12 +2,12 @@
 """
 Industrial Camera Examples
 
-Demonstrates usage of various industrial cameras (Basler, Ximea, etc.)
+Demonstrates usage of various industrial cameras (Basler, GenICam, etc.)
 with exposure and gain controls.
 """
 
 import cv2
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 
 def test_basler_camera():
@@ -24,20 +24,6 @@ def test_basler_camera():
     camera.start_async()
     run_camera_test(camera, "Basler Camera")
 
-
-def test_ximea_camera():
-    """Test Ximea camera capture."""
-    cv2.namedWindow("Ximea Camera", cv2.WINDOW_NORMAL)
-    print("Testing Ximea Camera:")
-    
-    camera = FrameSourceFactory.create('ximea', threaded=True)
-    
-    if not camera.connect():
-        print("Failed to connect to Ximea camera")
-        return
-    
-    camera.start_async()
-    run_camera_test(camera, "Ximea Camera")
 
 
 def run_camera_test(camera, window_name):
@@ -135,18 +121,11 @@ def main():
     """Test industrial cameras."""
     print("Industrial Camera Examples")
     print("1. Basler Camera")
-    print("2. Ximea Camera")
     
-    choice = input("Select camera type (1-2, or 'all' for both): ").strip()
+    choice = input("Select camera type (1, or just press Enter for Basler): ").strip()
     
-    if choice == '1':
+    if choice == '1' or choice == '':
         test_basler_camera()
-    elif choice == '2':
-        test_ximea_camera()
-    elif choice.lower() == 'all':
-        print("Testing all industrial cameras...")
-        test_basler_camera()
-        test_ximea_camera()
     else:
         print("Invalid choice. Testing Basler camera by default.")
         test_basler_camera()

@@ -51,6 +51,42 @@ When I work on computer vision, robotics, or video analytics projects, I often n
 
 ## Installation
 
+### Install from PyPI
+
+```sh
+pip install framesource
+```
+
+With optional extras:
+
+```sh
+# Audio spectrogram support
+pip install "framesource[audio]"
+
+# Basler camera support
+pip install "framesource[basler]"
+
+# RealSense camera support
+pip install "framesource[realsense]"
+
+# GenICam (Harvester) support
+pip install "framesource[genicam]"
+
+# Everything with a PyPI-installable dependency
+pip install "framesource[full]"
+
+# Multiple extras at once
+pip install "framesource[audio,basler,realsense]"
+```
+
+> **Note on vendor SDK cameras:** Ximea and Huateng/MindVision backends ship with
+> the package but rely on proprietary drivers that are **not** available on PyPI.
+> Install the vendor SDK separately (Ximea `xiapi`, or the Huateng/MindVision
+> camera drivers) and the corresponding backend will activate automatically.
+>
+> The 360°/fisheye processors only require the core dependencies (`numpy`,
+> `opencv-python`) and work out of the box — no extra needed.
+
 ### Install Directly from GitHub
 
 You can install FrameSource directly from GitHub without cloning:
@@ -72,7 +108,7 @@ Clone the repository and install with pip:
 
 ```sh
 git clone https://github.com/olkham/FrameSource.git
-cd framesource
+cd FrameSource
 pip install .
 ```
 
@@ -100,6 +136,9 @@ pip install "framesource[basler] @ git+https://github.com/olkham/FrameSource.git
 
 # With RealSense camera support
 pip install "framesource[realsense] @ git+https://github.com/olkham/FrameSource.git"
+
+# With GenICam (Harvester) support
+pip install "framesource[genicam] @ git+https://github.com/olkham/FrameSource.git"
 
 # With all optional features
 pip install "framesource[full] @ git+https://github.com/olkham/FrameSource.git"
@@ -152,7 +191,7 @@ pip install pyrealsense2
 
 
 ```python
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 # Webcam
 cap = FrameSourceFactory.create('webcam', source=0)
@@ -185,9 +224,9 @@ cap.disconnect()
 
 #### Intel RealSense Camera
 ```python
-from frame_source.realsense_capture import RealsenseCapture
-from frame_processors import RealsenseDepthProcessor
-from frame_processors.realsense_depth_processor import RealsenseProcessingOutput
+from framesource.sources.realsense_capture import RealsenseCapture
+from framesource.processors import RealsenseDepthProcessor
+from framesource.processors.realsense_depth_processor import RealsenseProcessingOutput
 
 # Tested with Intel RealSense D456 camera
 cap = RealsenseCapture(width=640, height=480)
@@ -204,7 +243,7 @@ cap.disconnect()
 
 #### Folder of Images
 ```python
-from frame_source.folder_capture import FolderCapture
+from framesource.sources.folder_capture import FolderCapture
 cap = FolderCapture('media/image_seq', sort_by='name', width=640, height=480, fps=15, real_time=True, loop=True)
 cap.connect()
 while cap.is_connected:
@@ -216,7 +255,7 @@ cap.disconnect()
 
 #### Screen Capture
 ```python
-from frame_source.screen_capture import ScreenCapture
+from framesource.sources.screen_capture import ScreenCapture
 cap = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
 cap.connect()
 cap.start_async()  # For background capture (optional)
@@ -268,8 +307,8 @@ FrameSource includes powerful frame processors for specialized transformations:
 Convert 360° equirectangular footage to normal pinhole camera views with interactive controls:
 
 ```python
-from frame_source import FrameSourceFactory
-from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+from framesource import FrameSourceFactory
+from framesource.processors.equirectangular360_processor import Equirectangular2PinholeProcessor
 
 # Load 360° video or connect to 360° webcam
 cap = FrameSourceFactory.create('video_file', source='360_video.mp4')
@@ -323,7 +362,7 @@ while cap.is_connected:
 Extend the `FrameProcessor` base class for your own transformations:
 
 ```python
-from frame_processors.frame_processor import FrameProcessor
+from framesource.processors.frame_processor import FrameProcessor
 import cv2
 
 class GrayscaleProcessor(FrameProcessor):
@@ -357,7 +396,7 @@ processed_frame = processor.process(original_frame)
 Want to add a new camera or source? Just subclass `VideoCaptureBase` and register it:
 
 ```python
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 FrameSourceFactory.register_capture_type('my_camera', MyCameraCapture)
 ```
 
@@ -366,7 +405,7 @@ FrameSourceFactory.register_capture_type('my_camera', MyCameraCapture)
 Create custom frame processors by extending `FrameProcessor`:
 
 ```python
-from frame_processors.frame_processor import FrameProcessor
+from framesource.processors.frame_processor import FrameProcessor
 
 class MyCustomProcessor(FrameProcessor):
     def __init__(self, custom_param=1.0):

@@ -7,7 +7,7 @@ and real-time playback controls.
 """
 
 import cv2
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 
 def main():

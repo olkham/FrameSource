@@ -6,7 +6,7 @@ Demonstrates IP camera capture using RTSP or HTTP streams.
 """
 
 import cv2
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 
 def main():

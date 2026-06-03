@@ -36,8 +36,8 @@ def simple_frame_producer(capture_source, frame_queue: queue.Queue, stop_event: 
     
     Example:
         ```python
-        from frame_source import WebcamCapture
-        from frame_source.threading_utils import simple_frame_producer
+        from framesource import WebcamCapture
+        from framesource.threading_utils import simple_frame_producer
         import queue
         import threading
         
@@ -109,8 +109,8 @@ class FrameProducer:
     
     Example:
         ```python
-        from frame_source import WebcamCapture
-        from frame_source.threading_utils import FrameProducer
+        from framesource import WebcamCapture
+        from framesource.threading_utils import FrameProducer
         
         camera = WebcamCapture(source=0)
         producer = FrameProducer(camera, max_queue_size=10, target_fps=30)
@@ -235,7 +235,7 @@ def multiprocess_frame_producer(source_config: dict, frame_queue, stop_event):
     Example:
         ```python
         import multiprocessing
-        from frame_source.threading_utils import multiprocess_frame_producer
+        from framesource.threading_utils import multiprocess_frame_producer
         
         source_config = {'source': 0, 'width': 640, 'height': 480}
         frame_queue = multiprocessing.Queue(maxsize=10)

@@ -1,18 +1,46 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "setuptools_scm"]
+requires = ["setuptools>=61.0", "wheel", "setuptools_scm>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "framesource"
-# version is set dynamically from frame_source/_version.py
+# version is derived from git tags via setuptools_scm
 dynamic = ["version"]
 description = "A flexible, extensible Python framework for acquiring frames from cameras, video files, image folders, screen capture, and audio spectrograms with built-in frame processors."
 authors = [
     { name = "Oliver Hamilton" }
 ]
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = { file = "LICENSE" }
+keywords = [
+    "camera",
+    "computer-vision",
+    "video-capture",
+    "webcam",
+    "rtsp",
+    "realsense",
+    "basler",
+    "screen-capture",
+    "frame-grabber",
+    "opencv",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video :: Capture",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
 dependencies = [
     "opencv-python",
     "numpy",
@@ -23,6 +51,11 @@ dependencies = [
     "pywin32; platform_system=='Windows'",
     "pyobjc-framework-Quartz; platform_system=='Darwin'"
 ]
+
+[project.urls]
+Homepage = "https://github.com/olkham/FrameSource"
+Repository = "https://github.com/olkham/FrameSource"
+Issues = "https://github.com/olkham/FrameSource/issues"
 
 [project.optional-dependencies]
 audio = [
@@ -36,12 +69,16 @@ basler = [
 realsense = [
     "pyrealsense2"
 ]
+genicam = [
+    "harvesters"
+]
 full = [
     "librosa",
     "soundfile",
     "pyaudio",
     "pypylon",
-    "pyrealsense2"
+    "pyrealsense2",
+    "harvesters"
 ]
 
 [tool.black]
@@ -60,7 +97,15 @@ addopts = "-ra -q"
 testpaths = ["tests"]
 
 [tool.setuptools]
-packages = ["frame_source", "frame_processors"]
+package-dir = { "" = "src" }
 
-[tool.setuptools.dynamic]
-version = {attr = "frame_source._version.__version__"}
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"framesource" = ["py.typed"]
+"framesource.sources" = ["mvsdk.py"]
+
+[tool.setuptools_scm]
+write_to = "src/framesource/_version.py"
+fallback_version = "0.2.7"

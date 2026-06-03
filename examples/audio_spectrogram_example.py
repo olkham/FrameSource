@@ -7,7 +7,7 @@ contrast controls, colormap options, and real-time parameter adjustment.
 """
 
 import cv2
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 
 def main():

@@ -5,7 +5,7 @@ Test script to verify grayscale default and colormap switching functionality.
 
 import cv2
 import numpy as np
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 def test_grayscale_default():
     """Test that grayscale is the default and colormaps can be switched."""

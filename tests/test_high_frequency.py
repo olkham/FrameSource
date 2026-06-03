@@ -6,7 +6,7 @@ Tests frequency ranges up to 20kHz to ensure proper sample rate adjustment.
 
 import cv2
 import numpy as np
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 def test_high_frequency_audio():
     """Test audio spectrogram capture with high frequency range (20Hz - 20kHz)."""

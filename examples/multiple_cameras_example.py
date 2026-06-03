@@ -8,7 +8,7 @@ and viewing them in a grid layout.
 
 import cv2
 from typing import List, Dict, Any
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 
 def main():
@@ -18,13 +18,15 @@ def main():
     # Configuration for different camera types
     # Uncomment/modify the cameras you want to test
     cameras_config: List[Dict[str, Any]] = [
-        # {'capture_type': 'webcam', 'source': 0, 'threaded': True},
+        {'capture_type': 'webcam', 'source': 0, 'threaded': False},
         # {'capture_type': 'basler', 'threaded': True},
         # {'capture_type': 'ximea', 'threaded': True},
-        {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},
-        {'capture_type': 'video_file', 'source': "../media/geti_demo.mp4", 'loop': True, 'threaded': True},
-        {'capture_type': 'folder', 'source': "../media/image_seq", 'sort_by': 'name', 'fps': 10, 'real_time': True, 'loop': True, 'threaded': True},
-        {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 400, 'h': 300, 'fps': 15, 'threaded': True}
+        # {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},
+        # {'capture_type': 'video_file', 'source': "media/geti_demo.mp4", 'loop': True, 'threaded': True},
+        # {'capture_type': 'folder', 'source': "media/image_seq", 'sort_by': 'name', 'fps': 10, 'real_time': True, 'loop': True, 'threaded': True},
+        # {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 400, 'h': 300, 'fps': 15, 'threaded': True},
+        # {'capture_type': 'realsense', 'width': 1280, 'height': 720, 'threaded': False},
+        # {'capture_type': 'genicam', 'source': 'FNCF000001', 'threaded': True},
     ]
     
     capture_instances = []
@@ -33,15 +35,15 @@ def main():
     
     # Connect to all cameras
     for idx, cam_cfg in enumerate(cameras_config):
-        name = cam_cfg.pop('capture_type', None)
-        if not name:
-            print(f"Camera config missing 'capture_type': {cam_cfg}")
-            continue
-            
+        # name = cam_cfg.pop('capture_type', None)
+        # if not name:
+        #     print(f"Camera config missing 'capture_type': {cam_cfg}")
+        #     continue
+        name = cam_cfg.get('capture_type', 'unknown')
         print(f"Connecting to {name}...")
-        
+
         try:
-            camera = FrameSourceFactory.create(name, **cam_cfg)
+            camera = FrameSourceFactory.create(**cam_cfg)
             if camera.connect():
                 # Configure window position in grid
                 cv2.namedWindow(f"{name}", cv2.WINDOW_NORMAL)
@@ -59,7 +61,8 @@ def main():
                     pass  # Not all cameras support this
                 
                 # Start threaded capture
-                camera.start_async()
+                if cam_cfg.get('threaded', False):
+                    camera.start_async()
                 capture_instances.append((name, camera))
                 print(f"✓ Connected to {name}")
             else:
@@ -70,6 +73,11 @@ def main():
     if not capture_instances:
         print("No cameras connected successfully")
         return
+    
+    # Give background threads time to start up and capture first frames
+    import time
+    print("Waiting for cameras to initialize...")
+    time.sleep(1.0)  # Wait 1 second for all background threads to start
     
     print(f"\nConnected to {len(capture_instances)} cameras")
     print("Press 'q' to quit, 'h' for help")
@@ -102,7 +110,7 @@ def main():
                 print("All cameras disconnected")
                 break
             
-            key = cv2.waitKey(1) & 0xFF
+            key = cv2.waitKey(30) & 0xFF
             if key == ord('q'):
                 break
             elif key == ord('h'):

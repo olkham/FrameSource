@@ -6,7 +6,7 @@ Compares performance between threaded and non-threaded modes.
 
 import time
 import cv2
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 def test_threading_performance():
     """Compare threaded vs non-threaded performance for audio capture."""
