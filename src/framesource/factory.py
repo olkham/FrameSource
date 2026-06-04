@@ -48,7 +48,7 @@ for _key, _module_name, _class_name in _OPTIONAL_SOURCES:
         _module = importlib.import_module(f'.sources.{_module_name}', __package__)
         _capture_imports[_key] = getattr(_module, _class_name)
     except Exception as e:  # noqa: BLE001 - vendor SDKs may raise non-ImportError
-        logger.warning(f"{_class_name} unavailable: {e}")
+        logger.debug("%s unavailable: %s", _class_name, e)
 
 
 class FrameSourceFactory:

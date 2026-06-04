@@ -1,7 +1,71 @@
+import time
+import uuid as _uuid
+
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Any
+
+
+class Frame(np.ndarray):
+    """A numpy array subclass that carries per-frame metadata.
+
+    Because ``Frame`` *is* a numpy array it works transparently with any
+    OpenCV or numpy function::
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # works as-is
+        print(frame.timestamp, frame.uuid)               # metadata intact
+
+    Attributes:
+        timestamp (float): UNIX time of capture.
+        count (int | None): Monotonically-increasing counter per source.
+        uuid (str): UUID4 string uniquely identifying this frame.
+        source (str | None): Identifies the capture source.
+        metadata (dict): Free-form key/value store for extra fields.
+    """
+
+    def __new__(
+        cls,
+        input_array: np.ndarray,
+        timestamp: Optional[float] = None,
+        count: Optional[int] = None,
+        uuid: Optional[str] = None,
+        source: Optional[str] = None,
+        metadata: Optional[dict] = None,
+    ) -> "Frame":
+        obj = np.asarray(input_array).view(cls)
+        obj.timestamp = timestamp if timestamp is not None else time.time()
+        obj.count = count
+        obj.uuid = uuid if uuid is not None else str(_uuid.uuid4())
+        obj.source = source
+        obj.metadata = metadata if metadata is not None else {}
+        return obj
+
+    def __array_finalize__(self, obj: Optional[np.ndarray]) -> None:
+        """Called whenever a new view / copy of a Frame is produced."""
+        if obj is None:
+            return
+        self.timestamp = getattr(obj, "timestamp", None)
+        self.count = getattr(obj, "count", None)
+        self.uuid = getattr(obj, "uuid", None)
+        self.source = getattr(obj, "source", None)
+        self.metadata = getattr(obj, "metadata", {})
+
+    def __reduce__(self):
+        """Extend numpy pickling so metadata survives pickle / deepcopy."""
+        pickled = super().__reduce__()
+        extra = (self.timestamp, self.count, self.uuid, self.source, self.metadata)
+        np_state = pickled[2] if isinstance(pickled[2], tuple) else (pickled[2],)
+        return (pickled[0], pickled[1], np_state + extra)
+
+    def __setstate__(self, state):
+        *np_state, ts, cnt, uid, src, meta = state
+        super().__setstate__(tuple(np_state))
+        self.timestamp = ts
+        self.count = cnt
+        self.uuid = uid
+        self.source = src
+        self.metadata = meta
 
 class VideoCaptureBase(ABC):
     # Class attribute indicating if this capture type supports device discovery
@@ -75,6 +139,7 @@ class VideoCaptureBase(ABC):
         self.is_connected = False
         self._exposure = None
         self._gain = None
+        self._frame_count = 0
         self.config = kwargs
         self.type = self.__class__.__name__
         
@@ -387,11 +452,20 @@ class VideoCaptureBase(ABC):
         return self._processors
 
     def read(self):
-        """Read a frame from the camera and apply any attached processors."""
-        ret, frame = self._read_implementation()  # Your existing read logic
-        
-        if ret and frame is not None and hasattr(self, '_processors') and self._processors:
-            for processor in self._processors:
-                frame = processor.process(frame)
-        
+        """Read a frame, wrap it in a Frame with metadata, and apply processors."""
+        ret, raw = self._read_implementation()
+
+        if ret and raw is not None:
+            frame: np.ndarray = Frame(
+                raw,
+                count=self._frame_count,
+                source=str(self.source),
+            )
+            self._frame_count += 1
+            if hasattr(self, '_processors') and self._processors:
+                for processor in self._processors:
+                    frame = processor.process(frame)
+        else:
+            frame = raw  # type: ignore[assignment]  # raw is None when ret is False
+
         return ret, frame

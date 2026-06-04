@@ -9,7 +9,7 @@ from .threading_utils import (
     create_producer_consumer_pair,
 )
 
-from .sources.video_capture_base import VideoCaptureBase
+from .sources.video_capture_base import VideoCaptureBase, Frame
 
 logger = logging.getLogger(__name__)
 
