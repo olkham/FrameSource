@@ -287,8 +287,13 @@ class BaslerCapture(VideoCaptureBase):
         if not self.is_connected or self.camera is None:
             return False
         try:
+            was_grabbing = self.camera.IsGrabbing()
+            if was_grabbing:
+                self.camera.StopGrabbing()
             self.camera.Width.SetValue(width)
             self.camera.Height.SetValue(height)
+            if was_grabbing:
+                self.camera.StartGrabbing(self.pylon.GrabStrategy_LatestImageOnly)
             logger.info(f"Set Basler camera resolution to {width}x{height}")
             return True
         except Exception as e:
