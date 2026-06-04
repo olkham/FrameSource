@@ -113,9 +113,9 @@ class FrameSourceFactory:
         capture_class = cls._capture_types[capture_type]
         cc = capture_class(source=source, **kwargs)
 
-        connect = kwargs.pop('connect', False)
+        connect = kwargs.pop('connect', True)
 
-        if connect and source is not None:
+        if connect and cc is not None:
             cc.connect()
 
         return cc
