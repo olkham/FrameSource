@@ -3,9 +3,9 @@ import time
 import cv2
 from typing import Any, List
 
-from frame_source import FrameSourceFactory
-from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
-from frame_source.realsense_capture import RealsenseCapture
+from framesource import FrameSourceFactory
+from framesource.processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+from framesource.sources.realsense_capture import RealsenseCapture
 
 
 def test_audio_spectrogram(source=None, **kwargs):
@@ -320,7 +320,7 @@ def test_camera(name, **kwargs):
 
             print("Auto exposure/gain configured: exposure locked, gain variable")
         except Exception as e:
-            print(f"Error configuring Ximea auto exposure/gain: {e}")
+            print(f"Error configuring industrial camera auto exposure/gain: {e}")
 
         # camera.enable_auto_exposure(True)
         print(f"Exposure: {camera.get_exposure()}")
@@ -441,16 +441,28 @@ if __name__ == "__main__":
     #                        gamma_correction=2.0, noise_floor=-45, percentile_range=(0, 100), colormap=cv2.COLORMAP_INFERNO)
 
     #### Advanced realsense demo
-    from frame_processors import RealsenseDepthProcessor
-    from frame_processors.realsense_depth_processor import RealsenseProcessingOutput
-    camera = RealsenseCapture(width=640, height=480)
-    processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
-    camera.attach_processor(processor)
-    test_camera(camera)
+    # from framesource.processors import RealsenseDepthProcessor
+    # from framesource.processors.realsense_depth_processor import RealsenseProcessingOutput
+    # camera = RealsenseCapture(width=640, height=480)
+    # processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
+    # camera.attach_processor(processor)
+    # test_camera(camera)
 
+    from framesource import get_available_sources
+    sources = get_available_sources()
+    print("Available capture sources:")
+    for source in sources:
+        if source.get('available', False):
+            name = source['name']
+            source_type = source['type']
+            print(f"  ✅ {name:25s} (type: {source_type})")
+        else:
+            name = source['name']
+            error = source.get('error', 'Unknown')
+            print(f"  ⚠️  {name:25s} ({error})")
     #### Other demos
     # test_camera('basler')
-    # test_camera('ximea')
+    # test_camera('basler')
     # test_camera('webcam', source=0, threaded=True, width=1920, height=1080, fps=30)   # standard 1080p webcam
     # test_camera('webcam', source=0, threaded=True, width=2880, height=1440, fps=30)   # insta360 x5 webcam mode settings
     # test_camera('video_file', source="media/geti_demo.mp4", loop=True)
@@ -463,7 +475,7 @@ if __name__ == "__main__":
     # cameras = [
         # {'capture_type': 'genicam', 'threaded': True},
         # {'capture_type': 'basler', 'threaded': True},
-        # {'capture_type': 'ximea', 'threaded': True},
+        # {'capture_type': 'basler', 'threaded': True},
         # {'capture_type': 'webcam', 'threaded': True},
         # {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},
         # {'capture_type': 'video_file', 'source': "media/geti_demo.mp4", 'loop': True, 'threaded': True},

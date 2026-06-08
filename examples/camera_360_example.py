@@ -7,8 +7,8 @@ Includes interactive controls for adjusting the virtual camera view.
 """
 
 import cv2
-from frame_source import FrameSourceFactory
-from frame_processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+from framesource import FrameSourceFactory
+from framesource.processors.equirectangular360_processor import Equirectangular2PinholeProcessor
 
 
 
@@ -19,9 +19,11 @@ def main():
 
     print("Testing 360 Camera Capture:")
     
-    # Global variables for mouse callback
+    # Global variables for mouse callback and video recording
     processor = None
     mouse_dragging = False
+    video_writer = None
+    is_recording = False
     
     def mouse_callback(event, x, y, flags, param):
         """Handle mouse interactions on the equirectangular image."""
@@ -76,7 +78,7 @@ def main():
                 print(f"Clicked at pixel ({x}, {y}) -> Set angles: yaw={yaw:.1f}°, pitch={pitch:.1f}°, roll={roll:.1f}°")
     
     # Create webcam capture for 360 camera (adjust source as needed)
-    camera = FrameSourceFactory.create('webcam', source=0, threaded=True)
+    camera = FrameSourceFactory.create('webcam', source=1, threaded=True)
     
     if not camera.connect():
         print("Failed to connect to 360 camera")
@@ -115,6 +117,7 @@ def main():
             print("\n360 Camera Controls:")
             print("  ESC - Quit")
             print("  h - Show this help")
+            print("  SPACE - Start/Stop recording raw equirectangular video")
             print("  LEFT CLICK - Click anywhere on 360° image to look in that direction")
             print("  DRAG - Hold left mouse button and drag to continuously pan view")
             print("  MOUSE WHEEL - Scroll to adjust FOV (field of view)")
@@ -135,6 +138,10 @@ def main():
                 # Update mouse callback parameters with actual frame dimensions
                 mouse_params['frame_width'] = frame.shape[1]
                 mouse_params['frame_height'] = frame.shape[0]
+                
+                # Record raw equirectangular frame if recording is active
+                if is_recording and video_writer is not None:
+                    video_writer.write(frame)
                 
                 # Create a copy for display to avoid modifying the original frame
                 display_frame = frame.copy()
@@ -161,6 +168,11 @@ def main():
                 # Draw crosshair on DISPLAY COPY of equirectangular frame (green)
                 cv2.line(display_frame, (eq_x - 15, eq_y), (eq_x + 15, eq_y), (0, 255, 0), 3)
                 cv2.line(display_frame, (eq_x, eq_y - 15), (eq_x, eq_y + 15), (0, 255, 0), 3)
+                
+                # Draw recording indicator if recording
+                if is_recording:
+                    cv2.circle(display_frame, (30, 30), 15, (0, 0, 255), -1)
+                    cv2.putText(display_frame, "REC", (55, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
                 # Draw crosshair on projected frame center (yellow)
                 cv2.line(projected, (center_x_proj - 15, center_y_proj), (center_x_proj + 15, center_y_proj), (0, 255, 255), 3)
@@ -183,6 +195,25 @@ def main():
                 break
             elif key == ord('h'):  # Show help
                 print_help()
+            elif key == ord(' '):  # SPACE - Start/Stop recording
+                if not is_recording:
+                    # Start recording
+                    import datetime
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"360_recording_{timestamp}.mp4"
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    fps_value = camera.get_fps() or 30
+                    frame_size = (frame.shape[1], frame.shape[0])
+                    video_writer = cv2.VideoWriter(filename, fourcc, fps_value, frame_size)
+                    is_recording = True
+                    print(f"Started recording to {filename}")
+                else:
+                    # Stop recording
+                    is_recording = False
+                    if video_writer is not None:
+                        video_writer.release()
+                        video_writer = None
+                    print("Stopped recording")
             elif key == ord('w'):  # Pitch up
                 current_pitch = processor.get_parameter('pitch') or 0
                 processor.set_parameter('pitch', current_pitch + 5.0)
@@ -222,6 +253,11 @@ def main():
                 new_fov = max(current_fov - 5, 10)
                 processor.set_parameter('fov', new_fov)
                 print(f"FOV: {new_fov}°")
+    
+    # Clean up video writer if still recording
+    if video_writer is not None:
+        video_writer.release()
+        print("Recording stopped and saved")
     
     camera.disconnect()
     cv2.destroyAllWindows()

@@ -12,9 +12,9 @@ import queue
 import cv2
 import numpy as np
 from typing import Optional, Tuple
-from frame_source.webcam_capture import WebcamCapture
-from frame_source.realsense_capture import RealsenseCapture
-from frame_source.threading_utils import simple_frame_producer
+from framesource.sources.webcam_capture import WebcamCapture
+from framesource.sources.realsense_capture import RealsenseCapture
+from framesource.threading_utils import simple_frame_producer
 
 n_frames = 1000
 

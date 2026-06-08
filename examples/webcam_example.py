@@ -7,7 +7,7 @@ Supports threaded capture for smooth frame acquisition.
 """
 
 import cv2
-from frame_source import FrameSourceFactory
+from framesource import FrameSourceFactory
 
 
 def main():

@@ -8,19 +8,23 @@ from .frame_processor import FrameProcessor
 from .equirectangular360_processor import Equirectangular2PinholeProcessor
 from .fisheye2equirectangular_processor import Fisheye2EquirectangularProcessor
 
+__all__ = [
+    'FrameProcessor',
+    'Equirectangular2PinholeProcessor',
+    'Fisheye2EquirectangularProcessor',
+]
+
 # Conditionally import RealsenseDepthProcessor if pyrealsense2 is available
 try:
     from .realsense_depth_processor import RealsenseDepthProcessor
-    __all__ = [
-        'FrameProcessor',
-        'Equirectangular2PinholeProcessor',
-        'Fisheye2EquirectangularProcessor',
-        'RealsenseDepthProcessor'
-    ]
+    __all__.append('RealsenseDepthProcessor')
 except ImportError:
     # pyrealsense2 not available
-    __all__ = [
-        'FrameProcessor',
-        'Equirectangular2PinholeProcessor',
-        'Fisheye2EquirectangularProcessor',
-    ]
+    pass
+
+# Conditionally import HyperspectralChannelSelector if its dependencies are available
+try:
+    from .hyperspectral_processor import HyperspectralChannelSelector
+    __all__.append('HyperspectralChannelSelector')
+except ImportError:
+    pass

@@ -4,12 +4,8 @@ import cv2
 import logging
 import platform
 
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    # If running as main script, try absolute import
-    from video_capture_base import VideoCaptureBase
-from frame_processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
+from .video_capture_base import VideoCaptureBase
+from ..processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -522,7 +518,11 @@ class RealsenseCapture(VideoCaptureBase):
 
 if __name__ == "__main__":
     # Example usage
-    camera = RealsenseCapture(source=0)
+    camera = RealsenseCapture(width=640, height=480, processor=RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE))
+    
+    # processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
+    # camera.attach_processor(processor)
+
     if camera.connect():
         # camera.start_async()
         print("Realsense camera connected successfully.")
