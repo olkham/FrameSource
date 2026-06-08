@@ -81,37 +81,63 @@ class FrameSourceFactory:
 
 
     @classmethod
-    def create(cls, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:
+    def create(cls, source_type: Any = None, source_id: Any = None, capture_type: Any = None, source: Any = None, **kwargs) -> VideoCaptureBase:
         """
         Create a video capture instance.
         
         Args:
-            capture_type: Type of capture ('webcam', 'ipcam', 'basler', 'genicam', 'custom')
-            source: Source identifier
+            source_type: Type of capture ('webcam', 'ipcam', 'basler', 'genicam', 'custom')
+            source_id: Source identifier
+            capture_type: (DEPRECATED) Use source_type instead
+            source: (DEPRECATED) Use source_id instead
             **kwargs: Additional parameters for the specific capture type
             
         Returns:
             VideoCaptureBase: Configured capture instance
             
         Raises:
-            ValueError: If capture_type is not supported
+            ValueError: If source_type is not supported
         """
-        # If capture_type is not provided, try to get it from kwargs
-        if not capture_type:
-            capture_type = kwargs.pop('capture_type', None)
+        # Handle backward compatibility for capture_type -> source_type
+        if source_type is None and capture_type is not None:
+            logger.warning("Parameter 'capture_type' is deprecated, use 'source_type' instead")
+            source_type = capture_type
         
-        if not capture_type or capture_type not in cls._capture_types:
+        # Try to get source_type from kwargs if still not set
+        if source_type is None:
+            source_type = kwargs.pop('source_type', None)
+        
+        # Fall back to capture_type in kwargs for backward compatibility
+        if source_type is None:
+            source_type = kwargs.pop('capture_type', None)
+            if source_type is not None:
+                logger.warning("Parameter 'capture_type' is deprecated, use 'source_type' instead")
+        
+        if not source_type or source_type not in cls._capture_types:
             available_types = ', '.join(cls._capture_types.keys())
-            raise ValueError(f"Unsupported capture type: {capture_type}. Available types: {available_types}")
+            raise ValueError(f"Unsupported capture type: {source_type}. Available types: {available_types}")
         
-        if source is None:
-            source = kwargs.pop('source', None)
+        # Handle backward compatibility for source -> source_id
+        if source_id is None and source is not None:
+            logger.warning("Parameter 'source' is deprecated, use 'source_id' instead")
+            source_id = source
+        
+        # Try to get source_id from kwargs if still not set
+        if source_id is None:
+            source_id = kwargs.pop('source_id', None)
+        
+        # Fall back to source in kwargs for backward compatibility
+        if source_id is None:
+            source_id = kwargs.pop('source', None)
+            if source_id is not None:
+                logger.warning("Parameter 'source' is deprecated, use 'source_id' instead")
 
-        if source is None:
-            Warning("Source not provided, defaulting to 0")
+        if source_id is None:
+            logger.warning("Source not provided, defaulting to 0")
+            source_id = 0
 
-        capture_class = cls._capture_types[capture_type]
-        cc = capture_class(source=source, **kwargs)
+        capture_class = cls._capture_types[source_type]
+        cc = capture_class(source=source_id, **kwargs)
 
         connect = kwargs.pop('connect', True)
 
