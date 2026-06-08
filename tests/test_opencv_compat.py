@@ -12,7 +12,7 @@ def main(framework: str = "opencv"):
     if framework.lower() == "opencv":
         cap = cv2.VideoCapture(0)
     elif framework.lower() == "framesource":
-        cap = FrameSourceFactory.create(capture_type='webcam', source=0, connect=True)
+        cap = FrameSourceFactory.create(capture_type='webcam', source=0)
 
     while cap.isOpened():
         ret, frame = cap.read()

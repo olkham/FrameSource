@@ -16,18 +16,14 @@ def main():
     print("Testing Webcam Capture:")
     
     # Create webcam capture
-    camera = FrameSourceFactory.create('webcam', source=0, threaded=True)
-    
-    if not camera.connect():
-        print("Failed to connect to webcam")
-        return
-    
+    camera = FrameSourceFactory.create('webcam', source=0)
+       
     # Configure camera settings
     camera.set_frame_size(1920, 1080)  # Full HD
     camera.set_fps(30)
-    camera.start_async()
+    # camera.start_async()
     
-    if camera.is_connected:
+    if camera.isOpened():
         # Get exposure and gain ranges
         exposure_range = camera.get_exposure_range()
         gain_range = camera.get_gain_range()
@@ -67,7 +63,7 @@ def main():
         
         print_help()
         
-        while camera.is_connected:
+        while camera.isOpened():
             ret, frame = camera.read()
             if ret and frame is not None:
                 cv2.imshow("Webcam", frame)
