@@ -95,6 +95,9 @@ ignore_missing_imports = true
 minversion = "6.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+markers = [
+    "hardware: tests that require physical capture hardware (deselected by default with -m 'not hardware')",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }

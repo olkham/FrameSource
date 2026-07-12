@@ -18,7 +18,7 @@ warnings.warn(
 
 import framesource as _framesource
 from framesource import *  # noqa: F401,F403
-from framesource import FrameSourceFactory, VideoCaptureBase, get_available_sources  # noqa: F401
+from framesource import FrameSourceFactory, VideoCaptureBase  # noqa: F401
 
 __all__ = getattr(_framesource, "__all__", [])
 __version__ = getattr(_framesource, "__version__", "0.0.0")

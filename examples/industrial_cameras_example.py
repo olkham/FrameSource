@@ -15,13 +15,12 @@ def test_basler_camera():
     cv2.namedWindow("Basler Camera", cv2.WINDOW_NORMAL)
     print("Testing Basler Camera:")
     
-    camera = FrameSourceFactory.create('basler', threaded=True)
+    camera = FrameSourceFactory.create('basler')
     
     if not camera.connect():
         print("Failed to connect to Basler camera")
         return
     
-    camera.start_async()
     run_camera_test(camera, "Basler Camera")
 
 

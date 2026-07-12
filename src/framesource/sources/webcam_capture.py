@@ -1,85 +1,47 @@
-from typing import Optional, Tuple, Any, Dict
+from typing import Optional, Tuple, Any, Dict, List
 import numpy as np
 import cv2
 import logging
 import platform
 import sys
+import warnings
 
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    # If running as main script, try absolute import
-    from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
+from ..discovery import DeviceInfo
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class WebcamCapture(VideoCaptureBase):
     has_discovery = True
-    display_fields = [
-        {'key': 'name', 'label': 'Name'},
-        {'key': 'index', 'label': 'Index'},
-        {'key': 'backend_name', 'label': 'Backend'}
-    ]
-    
-    def start_async(self):
-        """
-        Start background thread to continuously capture frames from webcam.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
-        self._capture_thread.start()
-
-    def stop(self):
-        """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event is not None:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
-            self._capture_thread.join(timeout=2)
-        self._capture_thread = None
-        self._stop_event = None
-
-    def _background_capture(self):
-        import time
-        while not self._stop_event.is_set(): # type: ignore
-            success, frame = self._read_direct()
-            if success:
-                self._latest_frame = frame
-            # time.sleep(0.01)  # ~100 FPS max, adjust as needed
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        frame = getattr(self, '_latest_frame', None)
-        self._latest_frame = None  # Clear after reading to avoid stale data
-        return (frame is not None), frame
-
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Directly read a frame from the webcam (bypassing background thread logic).
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        if not self.is_connected or self.cap is None:
-            return False, None
-        ret, frame = self.cap.read()
-        return ret, frame if ret else None
+    supports_exposure = True
+    supports_gain = True
 
     """Webcam capture using OpenCV."""
-    
-    def __init__(self, source: int = 0, **kwargs):
+
+    def __init__(self, source: int = 0, *, width: Optional[int] = None,
+                 height: Optional[int] = None, fps: Optional[float] = None, **kwargs):
+        """Initialize the webcam capture.
+
+        Args:
+            source: Camera device index, or an ``api_pref:index`` /
+                ``api_pref:path`` string (as produced in the ``id`` field of
+                :meth:`discover`).
+            width: Desired frame width in pixels. Applied on :meth:`connect`
+                (together with ``height``) when provided.
+            height: Desired frame height in pixels. Applied on
+                :meth:`connect` (together with ``width``) when provided.
+            fps: Desired frames per second. Applied on :meth:`connect` when
+                provided.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
+        # Preserve the historical ``self.config`` contents: these options were
+        # previously mined from ``**kwargs`` and read back via ``self.config``
+        # in ``connect()``. Only forward explicitly-provided values so the
+        # ``'width' in self.config`` presence checks keep their old meaning.
+        for _key, _val in (('width', width), ('height', height), ('fps', fps)):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.cap = None
         # Set API preference based on OS
@@ -144,12 +106,14 @@ class WebcamCapture(VideoCaptureBase):
     
     def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
-        Return the latest frame captured by the background thread, or fall back to direct read if not running.
+        Read a single frame from the webcam.
+        Returns:
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
+        if not self.is_connected or self.cap is None:
+            return False, None
+        ret, frame = self.cap.read()
+        return ret, frame if ret else None
     
     def set_exposure(self, value: float) -> bool:
         """Set exposure (-13 to -1 for most webcams)."""
@@ -245,9 +209,9 @@ class WebcamCapture(VideoCaptureBase):
             return False
 
     @classmethod
-    def discover(cls) -> list:
+    def discover(cls) -> List[DeviceInfo]:
         try:
-            devices = []
+            devices: List[DeviceInfo] = []
             from cv2_enumerate_cameras import enumerate_cameras
             from cv2.videoio_registry import getBackendName
 
@@ -266,7 +230,18 @@ class WebcamCapture(VideoCaptureBase):
             camera_list.sort(key=lambda cam: cam.index)
 
             for camera_info in camera_list:
-                devices.append({"id": f"{camera_info.backend}:{camera_info.index}:{camera_info.path}","index":camera_info.index, "name":camera_info.name, "backend_index": camera_info.backend, "backend_name":getBackendName(camera_info.backend)})
+                # OS enumeration index -> not a stable identifier across replug.
+                devices.append(DeviceInfo(
+                    device_id=f"{camera_info.backend}:{camera_info.index}:{camera_info.path}",
+                    index=camera_info.index,
+                    name=camera_info.name,
+                    driver="opencv",
+                    id_stable=False,
+                    metadata={
+                        "backend_index": camera_info.backend,
+                        "backend_name": getBackendName(camera_info.backend),
+                    },
+                ))
             logger.info(f"Found {cls.__name__} input device: {devices}")
             return devices
         except ImportError:
@@ -277,6 +252,12 @@ class WebcamCapture(VideoCaptureBase):
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for webcam capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
             'title': 'Webcam Configuration',
             'description': 'Configure USB webcam or built-in camera settings',

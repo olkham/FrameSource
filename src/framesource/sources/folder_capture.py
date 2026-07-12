@@ -2,17 +2,11 @@ import os
 import cv2
 import numpy as np
 import time
+import warnings
 from typing import Optional, Tuple, List, Dict, Any
 import threading
 
-# Handle both relative imports (when used as module) and absolute imports (when run standalone)
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    # For standalone testing, add parent directory to path
-    import sys
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from framesource.sources.video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
 
 import logging
 
@@ -23,9 +17,11 @@ try:
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
-    print("Warning: watchdog library not available. Install with 'pip install watchdog' for automatic folder monitoring.")
+    logging.getLogger(__name__).warning(
+        "watchdog library not available. Install with 'pip install watchdog' "
+        "for automatic folder monitoring."
+    )
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -135,8 +131,25 @@ class FolderCapture(VideoCaptureBase):
     Supports automatic folder monitoring to detect new/removed images.
     """
     has_discovery = False  # Uses folder paths, not discoverable devices
-    
+    supports_exposure = False  # Still images have no controllable exposure
+    supports_gain = False      # Still images have no controllable gain
+
     def __init__(self, source: str, sort_by: str = 'name', width: Optional[int] = None, height: Optional[int] = None, fps: float = 30.0, real_time: bool = True, loop: bool = False, watch_folder: bool = True, **kwargs):
+        """Initialize the folder (image sequence) capture.
+
+        Args:
+            source: Path to the folder containing image files.
+            sort_by: ``'name'`` (default) or ``'date'`` ordering of images.
+            width: Optional target frame width (images are resized when both
+                ``width`` and ``height`` are set).
+            height: Optional target frame height (see ``width``).
+            fps: Playback frame rate in frames per second.
+            real_time: Play at ``fps`` (disable for fastest processing).
+            loop: Restart from the first image when the end is reached.
+            watch_folder: Monitor the folder for added/removed files (requires
+                the optional ``watchdog`` dependency).
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
         super().__init__(source, **kwargs)
         self.sort_by = sort_by
         self.width = width
@@ -221,52 +234,6 @@ class FolderCapture(VideoCaptureBase):
                 self._refresh_file_list()
         else:
             self._refresh_file_list()
-
-    def start_async(self):
-        """
-        Start background frame capture in a separate thread.
-        Continuously updates self._latest_frame and self._latest_success.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._latest_success = False
-        def _capture_loop():
-            while not self._stop_event.is_set(): # type: ignore
-                success, frame = self._read_frame_for_thread()
-                self._latest_success = success
-                self._latest_frame = frame
-                time.sleep(0.01)  # 10ms delay to avoid busy loop
-        self._capture_thread = threading.Thread(target=_capture_loop, daemon=True)
-        self._capture_thread.start()
-
-    def stop(self):
-        """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread:
-            self._capture_thread.join(timeout=1)
-        self._capture_thread = None
-        self._stop_event = None
-
-    def _read_frame_for_thread(self):
-        """
-        Internal: Calls the read() method for background thread use.
-        """
-        return self._read_direct()
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        return getattr(self, '_latest_success', False), getattr(self, '_latest_frame', None)
 
     def connect(self) -> bool:
         if not os.path.isdir(self.source):
@@ -357,13 +324,6 @@ class FolderCapture(VideoCaptureBase):
         return True
 
     def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
-        # If background thread is running, return latest frame
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
-
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
         if not self.is_connected or not self.image_files:
             return False, None
         # Real-time playback control
@@ -695,6 +655,12 @@ class FolderCapture(VideoCaptureBase):
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for folder capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
             'title': 'Folder Capture Configuration',
             'description': 'Configure image folder as video stream settings',

@@ -2,95 +2,45 @@ from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import cv2
 import logging
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    from video_capture_base import VideoCaptureBase
+import warnings
+from .video_capture_base import VideoCaptureBase
 import time
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class VideoFileCapture(VideoCaptureBase):
     has_discovery = False  # Uses file paths, not discoverable devices
-    
-    def start_async(self):
-        """
-        Start background thread to continuously capture frames from video file.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
-        self._capture_thread.start()
-
-    def stop(self):
-        """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event is not None:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
-            self._capture_thread.join(timeout=2)
-        self._capture_thread = None
-        self._stop_event = None
-
-    def _background_capture(self):
-        import time
-        while not self._stop_event.is_set(): # type: ignore
-            success, frame = self._read_direct()
-            if success:
-                self._latest_frame = frame
-            time.sleep(0.01)  # ~100 FPS max, adjust as needed
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame) where success indicates if frame is available
-        """
-        frame = getattr(self, '_latest_frame', None)
-        return (frame is not None), frame
-
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Directly read a frame from the video file (bypassing background thread logic).
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        if not self.is_connected or self.cap is None:
-            return False, None
-        # Add delay for real-time playback simulation
-        if self.real_time:
-            video_fps = self.cap.get(cv2.CAP_PROP_FPS)
-            if video_fps > 0:
-                frame_duration = 1.0 / video_fps
-                current_time = time.time()
-                elapsed = current_time - self.time_of_last_frame
-                if elapsed < frame_duration:
-                    time.sleep(frame_duration - elapsed)
-                self.time_of_last_frame = time.time()
-        ret, frame = self.cap.read()
-        # If we've reached the end of the video and looping is enabled
-        if not ret and self.loop:
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = self.cap.read()
-            if self.real_time:
-                self.time_of_last_frame = time.time()
-        return ret, frame if ret else None
+    supports_exposure = False  # Video files have no controllable exposure
+    supports_gain = False      # Video files have no controllable gain
 
     """Video file capture using OpenCV."""
-    
-    def __init__(self, source: str, **kwargs):
+
+    def __init__(self, source: str, *, loop: bool = False, real_time: bool = True,
+                 width: Optional[int] = None, height: Optional[int] = None,
+                 fps: Optional[float] = None, **kwargs):
+        """Initialize the video file capture.
+
+        Args:
+            source: Path to the video file.
+            loop: Restart playback from the beginning when the end is reached.
+            real_time: Play at the file's native frame rate (disable for
+                fastest processing).
+            width: Optional target frame width (applied on :meth:`connect`).
+            height: Optional target frame height (applied on :meth:`connect`).
+            fps: Optional target frame rate (applied on :meth:`connect`).
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
+        # Forward the promoted options back into ``self.config`` so behaviour
+        # that reads them (``connect()`` for width/height/fps) is preserved.
+        for _key, _val in (('loop', loop), ('real_time', real_time),
+                           ('width', width), ('height', height), ('fps', fps)):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.cap = None
-        self.loop = kwargs.get('loop', False)
-        self.real_time = kwargs.get('real_time', True)
+        self.loop = loop
+        self.real_time = real_time
         self.time_of_last_frame = 0.0
         
     def connect(self) -> bool:
@@ -131,12 +81,30 @@ class VideoFileCapture(VideoCaptureBase):
     
     def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
-        Return the latest frame captured by the background thread, or fall back to direct read if not running.
+        Read a single frame from the video file.
+        Returns:
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
+        if not self.is_connected or self.cap is None:
+            return False, None
+        # Add delay for real-time playback simulation
+        if self.real_time:
+            video_fps = self.cap.get(cv2.CAP_PROP_FPS)
+            if video_fps > 0:
+                frame_duration = 1.0 / video_fps
+                current_time = time.time()
+                elapsed = current_time - self.time_of_last_frame
+                if elapsed < frame_duration:
+                    time.sleep(frame_duration - elapsed)
+                self.time_of_last_frame = time.time()
+        ret, frame = self.cap.read()
+        # If we've reached the end of the video and looping is enabled
+        if not ret and self.loop:
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = self.cap.read()
+            if self.real_time:
+                self.time_of_last_frame = time.time()
+        return ret, frame if ret else None
     
     def set_exposure(self, value: float) -> bool:
         """Set exposure (not applicable for video files)."""
@@ -190,6 +158,12 @@ class VideoFileCapture(VideoCaptureBase):
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for video file capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
             'title': 'Video File Configuration',
             'description': 'Configure video file playback settings',

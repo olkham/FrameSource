@@ -18,7 +18,7 @@ def main():
     # Configuration for different camera types
     # Uncomment/modify the cameras you want to test
     cameras_config: List[Dict[str, Any]] = [
-        {'capture_type': 'webcam', 'source': 0, 'threaded': False},
+        {'capture_type': 'webcam', 'source': 0},
         # {'capture_type': 'basler', 'threaded': True},
         # {'capture_type': 'ximea', 'threaded': True},
         # {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},
@@ -60,9 +60,6 @@ def main():
                 except:
                     pass  # Not all cameras support this
                 
-                # Start threaded capture
-                if cam_cfg.get('threaded', False):
-                    camera.start_async()
                 capture_instances.append((name, camera))
                 print(f"✓ Connected to {name}")
             else:
@@ -122,7 +119,6 @@ def main():
                         print(f"Reconnecting {name}...")
                         camera.disconnect()
                         if camera.connect():
-                            camera.start_async()
                             print(f"✓ {name} reconnected")
                         else:
                             print(f"✗ {name} reconnection failed")
@@ -140,8 +136,6 @@ def main():
         print("Disconnecting cameras...")
         for name, camera in capture_instances:
             try:
-                if camera.is_connected:
-                    camera.stop()
                 camera.disconnect()
                 print(f"✓ Disconnected {name}")
             except Exception as e:

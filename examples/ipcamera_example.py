@@ -26,15 +26,12 @@ def main():
         source=camera_url,
         # username="admin",      # Uncomment if authentication needed
         # password="password",   # Uncomment if authentication needed
-        threaded=True
     )
     
     if not camera.connect():
         print(f"Failed to connect to IP camera: {camera_url}")
         print("Make sure the URL is correct and the camera is accessible")
         return
-    
-    camera.start_async()
     
     if camera.is_connected:
         print(f"IP Camera URL: {camera_url}")
@@ -67,7 +64,6 @@ def main():
                     print("Camera disconnected, attempting reconnect...")
                     camera.disconnect()
                     if camera.connect():
-                        camera.start_async()
                         print("Reconnected successfully")
                     else:
                         print("Reconnection failed")
@@ -82,7 +78,6 @@ def main():
                 print("Reconnecting to IP camera...")
                 camera.disconnect()
                 if camera.connect():
-                    camera.start_async()
                     print("Reconnected successfully")
                 else:
                     print("Reconnection failed")

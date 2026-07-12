@@ -4,8 +4,6 @@ import logging
 import platform
 from .video_capture_base import VideoCaptureBase
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # The Huateng/MindVision SDK loads a vendor driver DLL at import time, which is
@@ -18,8 +16,11 @@ except (ImportError, OSError) as e:
     logger.warning(f"Huateng mvsdk SDK unavailable: {e}")
 
 class HuatengCapture(VideoCaptureBase):
+    supports_exposure = True
+    supports_gain = True
+
     """Huateng camera capture using mvsdk."""
-    
+
     def __init__(self, source: Any = None, **kwargs):
         super().__init__(source, **kwargs)
         self.hCamera = -1
@@ -81,7 +82,7 @@ class HuatengCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from Huateng camera: {e}")
             return False
 
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         if not self.is_connected or self.hCamera == -1:
             return False, None
         try:
@@ -97,12 +98,6 @@ class HuatengCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error reading from Huateng camera: {e}")
             return False, None
-
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
 
     def set_exposure(self, value: float) -> bool:
         try:
@@ -191,7 +186,6 @@ if __name__ == "__main__":
     import cv2
     camera = HuatengCapture(is_mono=False)
     if camera.connect():
-        camera.start_async()
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")

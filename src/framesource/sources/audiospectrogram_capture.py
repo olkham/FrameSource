@@ -3,7 +3,8 @@ import cv2
 import threading
 import time
 import logging
-from typing import Optional, Tuple, Any, Union, Dict
+import warnings
+from typing import Optional, Tuple, Any, Union, Dict, List
 from pathlib import Path
 
 try:
@@ -15,15 +16,32 @@ except ImportError as e:
     AUDIO_AVAILABLE = False
     MISSING_DEPS = str(e)
 
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    # If running as main script, try absolute import
-    from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
+from ..discovery import DeviceInfo
+from ..errors import MissingDependencyError
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _parse_freq_range(value: Union[str, Tuple[float, float], list]) -> Tuple[float, float]:
+    """Parse a frequency range given as ``(min, max)``, ``[min, max]`` or ``"min,max"``.
+
+    Raises:
+        ValueError: If the value does not contain exactly two numeric entries.
+    """
+    if isinstance(value, str):
+        parts = value.split(',')
+    elif isinstance(value, (tuple, list)):
+        parts = list(value)
+    else:
+        raise ValueError(
+            f"freq_range must be a (min_freq, max_freq) tuple/list or a 'min,max' string, got {value!r}")
+    if len(parts) != 2:
+        raise ValueError("freq_range must contain exactly 2 values: min_freq,max_freq")
+    try:
+        return (float(parts[0]), float(parts[1]))
+    except (TypeError, ValueError):
+        raise ValueError(f"freq_range values must be numeric, got {value!r}")
 
 
 class AudioSpectrogramCapture(VideoCaptureBase):
@@ -31,68 +49,95 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     Audio spectrogram capture implementation.
     """
     has_discovery = True
-    display_fields = [
-        {'key': 'name', 'label': 'Name'},
-        {'key': 'index', 'label': 'Index'},
-        {'key': 'channels', 'label': 'Channels'},
-        {'key': 'sample_rate', 'label': 'Sample Rate'}
-    ]
+    supports_exposure = False  # No optical exposure; stubs return a no-op
+    supports_gain = False      # No optical gain; stubs return a no-op
     """
     Capture audio spectrograms as video frames from microphones or audio files.
     Treats spectrograms as visual data that can be processed like regular video frames.
     """
-    
-    def __init__(self, source: Union[int, str, None] = None, **kwargs):
+
+    def __init__(self, source: Union[int, str, None] = None, *,
+                 n_mels: int = 128, n_fft: int = 2048, hop_length: int = 512,
+                 window_duration: float = 2.0,
+                 freq_range: Union[str, Tuple[float, float], list] = (20, 8000),
+                 sample_rate: int = 44100,
+                 colormap: Optional[Union[int, str]] = None,
+                 db_range: Tuple[float, float] = (-80, 0),
+                 frame_rate: int = 30, audio_buffer_size: int = 1024,
+                 contrast_method: str = 'fixed', adaptive_alpha: float = 0.95,
+                 percentile_range: Union[Tuple[float, float], list] = (5, 95),
+                 gamma_correction: float = 1.0, noise_floor: float = -70,
+                 **kwargs):
         """
         Initialize audio spectrogram capture.
-        
+
         Args:
-            source: Audio source - microphone index (int), file path (str), or None for default mic
-            **kwargs: Spectrogram parameters:
-                - n_mels: Number of mel bands (default: 128)
-                - n_fft: FFT window size (default: 2048)
-                - hop_length: Number of samples between successive frames (default: 512)
-                - window_duration: Duration of audio window in seconds (default: 2.0)
-                - freq_range: Frequency range tuple (min_freq, max_freq) (default: (20, 8000))
-                - sample_rate: Audio sample rate (default: 44100)
-                - colormap: OpenCV colormap for visualization (default: None for grayscale)
-                - db_range: Dynamic range in dB (default: (-80, 0))
-                - frame_rate: Spectrogram update rate in Hz (default: 30)
-                - audio_buffer_size: Audio buffer size in samples (default: 1024)
+            source: Audio source - microphone index (int), file path (str), or None for default mic.
+            n_mels: Number of mel bands (default: 128).
+            n_fft: FFT window size (default: 2048).
+            hop_length: Number of samples between successive frames (default: 512).
+            window_duration: Duration of audio window in seconds (default: 2.0).
+            freq_range: Frequency range as a ``(min_freq, max_freq)`` tuple/list
+                or a ``"min,max"`` string (default: ``(20, 8000)``).
+            sample_rate: Audio sample rate in Hz (default: 44100).
+            colormap: OpenCV colormap (int or name) for visualization, or None
+                for grayscale (default: None).
+            db_range: Dynamic range in dB (default: ``(-80, 0)``).
+            frame_rate: Spectrogram update rate in Hz (default: 30).
+            audio_buffer_size: Audio buffer size in samples (default: 1024).
+            contrast_method: Contrast enhancement method - ``'fixed'``,
+                ``'adaptive'`` or ``'percentile'`` (default: ``'fixed'``).
+            adaptive_alpha: Smoothing factor for adaptive normalization
+                (default: 0.95).
+            percentile_range: ``(low, high)`` percentiles for percentile
+                normalization (default: ``(5, 95)``).
+            gamma_correction: Gamma correction for contrast (default: 1.0).
+            noise_floor: Noise floor in dB (default: -70).
+            **kwargs: Additional passthrough options stored on ``self.config``.
         """
         if not AUDIO_AVAILABLE:
-            raise ImportError(f"Audio dependencies not available: {MISSING_DEPS}. "
-                            "Install with: pip install librosa soundfile pyaudio")
-        
+            raise MissingDependencyError('librosa/soundfile/pyaudio', extra='audio', details=MISSING_DEPS)
+
+        # Forward the promoted spectrogram options back into ``self.config`` so
+        # its contents match the historical ``**kwargs`` passthrough.
+        for _key, _val in (
+            ('n_mels', n_mels), ('n_fft', n_fft), ('hop_length', hop_length),
+            ('window_duration', window_duration), ('freq_range', freq_range),
+            ('sample_rate', sample_rate), ('colormap', colormap),
+            ('db_range', db_range), ('frame_rate', frame_rate),
+            ('audio_buffer_size', audio_buffer_size),
+            ('contrast_method', contrast_method), ('adaptive_alpha', adaptive_alpha),
+            ('percentile_range', percentile_range),
+            ('gamma_correction', gamma_correction), ('noise_floor', noise_floor),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
+
         super().__init__(source, **kwargs)
-        
+
         # Spectrogram parameters
-        self.n_mels = int(kwargs.get('n_mels', 128))
-        self.n_fft = int(kwargs.get('n_fft', 2048))
-        self.hop_length = int(kwargs.get('hop_length', 512))
-        self.window_duration = float(kwargs.get('window_duration', 2.0))
-        freq_range_str = kwargs.get('freq_range', '20,8000').split(',')
-        if len(freq_range_str) != 2:
-            raise ValueError("freq_range must contain exactly 2 values: min_freq,max_freq")
-        self.freq_range = (float(freq_range_str[0]), float(freq_range_str[1]))
-        self.sample_rate = int(kwargs.get('sample_rate', 44100))  # Increased to support higher frequencies
+        self.n_mels = int(n_mels)
+        self.n_fft = int(n_fft)
+        self.hop_length = int(hop_length)
+        self.window_duration = float(window_duration)
+        self.freq_range = _parse_freq_range(freq_range)
+        self.sample_rate = int(sample_rate)  # Increased to support higher frequencies
         # Validate and set colormap
-        colormap_param = kwargs.get('colormap', None)
-        self.colormap = self._validate_colormap(colormap_param)
-        self.db_range = kwargs.get('db_range', (-80, 0))
-        self.frame_rate = int(kwargs.get('frame_rate', 30))
-        self.audio_buffer_size = int(kwargs.get('audio_buffer_size', 1024))
+        self.colormap = self._validate_colormap(colormap)
+        self.db_range = db_range
+        self.frame_rate = int(frame_rate)
+        self.audio_buffer_size = int(audio_buffer_size)
 
         # Contrast enhancement parameters
-        self.contrast_method = kwargs.get('contrast_method', 'fixed')  # 'fixed', 'adaptive', 'percentile'
-        self.adaptive_alpha = float(kwargs.get('adaptive_alpha', 0.95))  # Smoothing factor for adaptive normalization
-        percentile_param = kwargs.get('percentile_range', (5, 95))
+        self.contrast_method = contrast_method  # 'fixed', 'adaptive', 'percentile'
+        self.adaptive_alpha = float(adaptive_alpha)  # Smoothing factor for adaptive normalization
+        percentile_param = percentile_range
         if isinstance(percentile_param, (tuple, list)) and len(percentile_param) == 2:
             self.percentile_range = (float(percentile_param[0]), float(percentile_param[1]))
         else:
             self.percentile_range = (5.0, 95.0)
-        self.gamma_correction = float(kwargs.get('gamma_correction', 1.0))  # Gamma correction for contrast
-        self.noise_floor = float(kwargs.get('noise_floor', -70))  # Noise floor in dB
+        self.gamma_correction = float(gamma_correction)  # Gamma correction for contrast
+        self.noise_floor = float(noise_floor)  # Noise floor in dB
 
         # Adaptive normalization state
         self._adaptive_min = None
@@ -131,68 +176,13 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         self.current_frame = None
         self.frame_lock = threading.Lock()
         
-        # Background thread variables
-        self._capture_thread = None
-        self._stop_event = None
-        self._latest_frame = None
-        
         logger.info(f"AudioSpectrogramCapture initialized - Source: {source}")
         logger.info(f"Spectrogram params: n_mels={self.n_mels}, n_fft={self.n_fft}, "
                    f"window_duration={self.window_duration}s, freq_range={self.freq_range}")
     
-    def start_async(self):
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
-        Start background thread to continuously generate spectrogram frames.
-        """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
-        self._capture_thread.start()
-        logger.info("Started background spectrogram capture thread")
-
-    def stop(self):
-        """
-        Stop background spectrogram capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event is not None:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
-            self._capture_thread.join(timeout=2)
-        self._capture_thread = None
-        self._stop_event = None
-        logger.info("Stopped background spectrogram capture thread")
-
-    def _background_capture(self):
-        """Background thread function for continuous spectrogram generation."""
-        frame_interval = 1.0 / self.frame_rate
-        while not self._stop_event.is_set():  # type: ignore
-            start_time = time.time()
-            success, frame = self._read_direct()
-            if success:
-                with self.frame_lock:
-                    self._latest_frame = frame
-            
-            # Maintain consistent frame rate
-            elapsed = time.time() - start_time
-            sleep_time = max(0, frame_interval - elapsed)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent spectrogram frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        with self.frame_lock:
-            frame = getattr(self, '_latest_frame', None)
-        return (frame is not None), frame
-
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Directly read a spectrogram frame (bypassing background thread logic).
+        Read a single spectrogram frame.
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
@@ -309,9 +299,6 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     def disconnect(self) -> bool:
         """Disconnect from audio source."""
         try:
-            # Stop background thread first
-            self.stop()
-            
             self.is_connected = False
             
             if self.audio_stream:
@@ -329,15 +316,6 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error disconnecting: {e}")
             return False
-    
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Return the latest frame captured by the background thread, or fall back to direct read if not running.
-        """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
     
     def _read_file_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
         """Read frame from audio file."""
@@ -791,19 +769,20 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         return np.clip(normalized, 0, 1)
 
     @classmethod
-    def discover(cls) -> list:
+    def discover(cls) -> List[DeviceInfo]:
         """
         Discover available audio input devices (microphones).
-        
+
         Returns:
-            list: List of dictionaries containing audio device information.
-                Each dict contains: {'index': int, 'name': str, 'channels': int, 'sample_rate': float}
+            List[DeviceInfo]: Discovered input devices. Each entry behaves like
+                a dict with keys ``index``, ``name``, ``channels`` and
+                ``sample_rate`` (the latter two via ``metadata``).
         """
         if not AUDIO_AVAILABLE:
             logger.warning("Audio dependencies not available. Cannot discover audio devices.")
             return []
-        
-        devices = []
+
+        devices: List[DeviceInfo] = []
         
         try:
             p = pyaudio.PyAudio()
@@ -818,12 +797,17 @@ class AudioSpectrogramCapture(VideoCaptureBase):
                     # Only include input devices (microphones)
                     max_input_channels = device_info.get('maxInputChannels', 0)
                     if isinstance(max_input_channels, (int, float)) and max_input_channels > 0:
-                        device_data = {
-                            'index': i,
-                            'name': device_info['name'],
-                            'channels': device_info['maxInputChannels'],
-                            'sample_rate': device_info['defaultSampleRate']
-                        }
+                        device_data = DeviceInfo(
+                            device_id=str(i),
+                            index=i,
+                            name=device_info['name'],
+                            driver='pyaudio',
+                            id_stable=False,
+                            metadata={
+                                'channels': device_info['maxInputChannels'],
+                                'sample_rate': device_info['defaultSampleRate'],
+                            },
+                        )
                         devices.append(device_data)
                         logger.info(f"Found audio input device: {device_data}")
                         
@@ -841,6 +825,12 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for audio spectrogram capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
             'title': 'Audio Spectrogram Configuration',
             'description': 'Configure audio spectrogram capture from microphones or audio files',

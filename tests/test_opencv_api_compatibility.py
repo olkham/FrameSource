@@ -21,7 +21,7 @@ def test_opencv_api():
         
         # Try to create a webcam capture
         print("\n1️⃣ Creating WebcamCapture instance...")
-        cap = FrameSourceFactory.create('webcam', source=0)
+        cap = FrameSourceFactory.create('webcam', source_id=0, connect=False)
         print(f"   ✅ Created: {cap}")
         
         # Test isOpened() before connecting

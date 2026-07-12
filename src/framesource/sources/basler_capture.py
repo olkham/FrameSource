@@ -1,91 +1,16 @@
 from typing import Optional, Tuple, Any, Dict
 import numpy as np
 import logging
+import warnings
 
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    # If running as main script, try absolute import
-    from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class BaslerCapture(VideoCaptureBase):
     has_discovery = True
-    display_fields = [
-        {'key': 'name', 'label': 'Name'},
-        {'key': 'serial_number', 'label': 'Serial Number'},
-        {'key': 'device_class', 'label': 'Device Class'},
-        {'key': 'index', 'label': 'Index'}
-    ]
-    
-    def start_async(self):
-        """
-        Start background thread to continuously capture frames from Basler camera.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
-        self._capture_thread.start()
-
-    def stop(self):
-        """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event is not None:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
-            self._capture_thread.join(timeout=2)
-        self._capture_thread = None
-        self._stop_event = None
-
-    def _background_capture(self):
-        import time
-        while not self._stop_event.is_set(): # type: ignore
-            success, frame = self._read_direct()
-            if success:
-                self._latest_frame = frame
-            time.sleep(0.01)  # ~100 FPS max, adjust as needed
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        frame = getattr(self, '_latest_frame', None)
-        return (frame is not None), frame
-
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Directly read a frame from the Basler camera (bypassing background thread logic).
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        if not self.is_connected or self.camera is None:
-            return False, None
-        try:
-            grabResult = self.camera.RetrieveResult(5000, self.pylon.TimeoutHandling_ThrowException) # type: ignore
-            if grabResult.GrabSucceeded():
-                if self.converter:
-                    image = self.converter.Convert(grabResult)
-                    img_array = image.GetArray()
-                else:
-                    img_array = grabResult.Array
-                grabResult.Release()
-                return True, img_array
-            else:
-                grabResult.Release()
-                return False, None
-        except Exception as e:
-            logger.error(f"Error reading from Basler camera: {e}")
-            return False, None
+    supports_exposure = True
+    supports_gain = True
 
     """Basler camera capture using pypylon."""
     
@@ -188,12 +113,28 @@ class BaslerCapture(VideoCaptureBase):
     
     def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         """
-        Return the latest frame captured by the background thread, or fall back to direct read if not running.
+        Read a single frame from the Basler camera.
+        Returns:
+            Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
+        if not self.is_connected or self.camera is None:
+            return False, None
+        try:
+            grabResult = self.camera.RetrieveResult(5000, self.pylon.TimeoutHandling_ThrowException) # type: ignore
+            if grabResult.GrabSucceeded():
+                if self.converter:
+                    image = self.converter.Convert(grabResult)
+                    img_array = image.GetArray()
+                else:
+                    img_array = grabResult.Array
+                grabResult.Release()
+                return True, img_array
+            else:
+                grabResult.Release()
+                return False, None
+        except Exception as e:
+            logger.error(f"Error reading from Basler camera: {e}")
+            return False, None
     
     def get_exposure_range(self) -> Tuple[float, float]:
         """Get exposure range in microseconds."""
@@ -383,6 +324,12 @@ class BaslerCapture(VideoCaptureBase):
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for Basler camera capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
             'title': 'Basler Camera Configuration',
             'description': 'Configure Basler industrial camera settings',

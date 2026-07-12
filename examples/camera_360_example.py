@@ -78,7 +78,7 @@ def main():
                 print(f"Clicked at pixel ({x}, {y}) -> Set angles: yaw={yaw:.1f}°, pitch={pitch:.1f}°, roll={roll:.1f}°")
     
     # Create webcam capture for 360 camera (adjust source as needed)
-    camera = FrameSourceFactory.create('webcam', source=1, threaded=True)
+    camera = FrameSourceFactory.create('webcam', source=1)
     
     if not camera.connect():
         print("Failed to connect to 360 camera")
@@ -105,8 +105,6 @@ def main():
     cv2.setMouseCallback("360 Camera", mouse_callback, mouse_params)
     
     # camera.attach_processor(processor)
-    
-    camera.start_async()
     
     if camera.is_connected:
         print(f"Frame size: {camera.get_frame_size()}")

@@ -19,7 +19,6 @@ def main():
     # Create RealSense capture
     frame_processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.RGB)
     camera = RealsenseCapture(width=1280, height=720, processor=frame_processor)
-    camera.start_async()
     
     if not camera.connect():
         print("Failed to connect to RealSense camera")
@@ -68,8 +67,6 @@ def main():
                 camera._processors[0].output_format = RealsenseProcessingOutput.RGBD
                 print("Output: RGBD combined")
     
-    # Properly stop the background thread before disconnecting
-    camera.stop()
     camera.disconnect()
     cv2.destroyAllWindows()
 

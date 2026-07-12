@@ -35,9 +35,6 @@ def main():
         print("Failed to connect to audio source")
         return
     
-    frame_source.start_async()
-    print("Started background spectrogram capture thread")
-    
     if frame_source.is_connected:
         print(f"Audio spectrogram parameters:")
         print(f"  Frame size: {frame_source.get_frame_size()}")
@@ -165,7 +162,6 @@ def main():
                     frame_source.set_percentile_range(new_low, new_high)
                     print(f"Percentile range: {new_low}-{new_high}% (less aggressive)")
     
-    frame_source.stop()
     frame_source.disconnect()
     cv2.destroyAllWindows()
 

@@ -21,7 +21,6 @@ def main():
     # Configure camera settings
     camera.set_frame_size(1920, 1080)  # Full HD
     camera.set_fps(30)
-    # camera.start_async()
     
     if camera.isOpened():
         # Get exposure and gain ranges

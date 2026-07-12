@@ -79,7 +79,7 @@ def main():
 
     # Try to connect to a fisheye camera (webcam source 0)
     # For testing, you can also use a fisheye image/video file
-    camera = FrameSourceFactory.create('webcam', source=0, threaded=True)
+    camera = FrameSourceFactory.create('webcam', source=0)
 
     if not camera.connect():
         print("No camera found. Creating a synthetic fisheye test pattern...")
@@ -124,7 +124,6 @@ def main():
 
         synthetic_frame = create_synthetic_fisheye(800)
     else:
-        camera.start_async()
         print(f"Camera connected: {camera.get_frame_size()}")
 
     # Create fisheye to equirectangular processor

@@ -21,15 +21,12 @@ def main():
         y=100, 
         w=800, 
         h=600, 
-        fps=30, 
-        threaded=True
+        fps=30
     )
     
     if not camera.connect():
         print("Failed to connect to screen capture")
         return
-    
-    camera.start_async()
     
     if camera.is_connected:
         print(f"Capture region: 100,100 800x600")

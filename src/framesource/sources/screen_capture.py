@@ -1,15 +1,12 @@
 import numpy as np
 import cv2
 import time
+import warnings
 from typing import Optional, Tuple, Any, Dict
 import logging
 import threading
 
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    # If running as main script, try absolute import
-    from video_capture_base import VideoCaptureBase
+from .video_capture_base import VideoCaptureBase
 
 try:
     import mss
@@ -64,7 +61,6 @@ except ImportError:
     LINUX_AVAILABLE = False
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ScreenCapture(VideoCaptureBase):
@@ -78,17 +74,27 @@ class ScreenCapture(VideoCaptureBase):
         fps (float): Target FPS (default 30)
     """
     has_discovery = True
-    display_fields = [
-        {'key': 'name', 'label': 'Name'},
-        {'key': 'type', 'label': 'Type'},
-        {'key': 'title', 'label': 'Title'},
-        {'key': 'width', 'label': 'Width'},
-        {'key': 'height', 'label': 'Height'},
-        {'key': 'left', 'label': 'X'},
-        {'key': 'top', 'label': 'Y'}
-    ]
-    
-    def __init__(self, x: int = 0, y: int = 0, w: int = 640, h: int = 480, fps: float = 30.0, **kwargs):
+    supports_exposure = False  # Screen pixels have no controllable exposure
+    supports_gain = False      # Screen pixels have no controllable gain
+
+    def __init__(self, x: int = 0, y: int = 0, w: int = 640, h: int = 480,
+                 fps: float = 30.0, *, hwnd: Optional[Any] = None, **kwargs):
+        """Initialize the screen-region capture.
+
+        Args:
+            x: Left edge of the capture region (pixels from the left).
+            y: Top edge of the capture region (pixels from the top).
+            w: Width of the capture region in pixels.
+            h: Height of the capture region in pixels.
+            fps: Target frame rate in frames per second.
+            hwnd: Optional native window handle to track (set automatically by
+                :meth:`from_window`).
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
+        # ``hwnd`` was previously accepted through ``**kwargs``; forward it
+        # unchanged so ``self.config`` keeps carrying it when provided.
+        if hwnd is not None:
+            kwargs['hwnd'] = hwnd
         super().__init__(**kwargs)
         self.x = x
         self.y = y
@@ -99,7 +105,7 @@ class ScreenCapture(VideoCaptureBase):
         self._thread_local = threading.local()
         self.is_connected = False
         self.time_of_last_frame = 0.0
-        self.hwnd = kwargs.get('hwnd', None)  # Optional window handle for tracking
+        self.hwnd = hwnd  # Optional window handle for tracking
     
     @classmethod
     def from_window(cls, window_id: Any, fps: float = 30.0, **kwargs):
@@ -215,52 +221,6 @@ class ScreenCapture(VideoCaptureBase):
         else:
             raise RuntimeError(f"Window capture not supported on {SYSTEM}")
 
-    def start_async(self):
-        """
-        Start background frame capture in a separate thread.
-        Continuously updates self._latest_frame and self._latest_success.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._latest_success = False
-        def _capture_loop():
-            while not self._stop_event.is_set(): # type: ignore
-                success, frame = self._read_frame_for_thread()
-                self._latest_success = success
-                self._latest_frame = frame
-                time.sleep(0.01)  # 10ms delay to avoid busy loop
-        self._capture_thread = threading.Thread(target=_capture_loop, daemon=True)
-        self._capture_thread.start()
-
-    def stop(self):
-        """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread:
-            self._capture_thread.join(timeout=1)
-        self._capture_thread = None
-        self._stop_event = None
-
-    def _read_frame_for_thread(self):
-        """
-        Internal: Calls the direct read method for background thread use (avoids recursion).
-        """
-        return self._read_direct()
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        return getattr(self, '_latest_success', False), getattr(self, '_latest_frame', None)
-
     def connect(self) -> bool:
         if mss is None:
             logger.error("mss is not installed. Cannot use ScreenCapture.")
@@ -274,13 +234,6 @@ class ScreenCapture(VideoCaptureBase):
         logger.info("ScreenCapture disconnected.")
         return True
 
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
-        # If background thread is running, return latest frame
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
-
     def _get_sct(self):
         if not hasattr(self._thread_local, 'sct') or self._thread_local.sct is None:
             if mss is None:
@@ -288,7 +241,7 @@ class ScreenCapture(VideoCaptureBase):
             self._thread_local.sct = mss.mss()
         return self._thread_local.sct
 
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
         if not self.is_connected:
             return False, None
         sct = self._get_sct()
@@ -678,6 +631,12 @@ class ScreenCapture(VideoCaptureBase):
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
         """Get configuration schema for screen capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
             'title': 'Screen Capture Configuration',
             'description': 'Configure screen/monitor capture settings',
@@ -769,7 +728,6 @@ if __name__ == "__main__":
     
     camera = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
     if camera.connect():
-        camera.start_async()
         print("Screen capture connected successfully.")
         print(f"Frame size: {camera.get_frame_size()}")
         print(f"FPS: {camera.get_fps()}")
