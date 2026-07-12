@@ -6,9 +6,15 @@ driven with `asyncio.run(...)` inside plain test functions (no pytest-asyncio).
 
 import asyncio
 import queue
+import threading
 import time
 
-from framesource.threading_utils import AsyncFrameSource, SharedProducer
+from framesource.threading_utils import (
+    AsyncFrameSource,
+    SharedProducer,
+    ProducerConsumer,
+    create_producer_consumer_pair,
+)
 from framesource.sources.video_capture_base import FrameSourceProtocol
 
 from conftest import MockCapture
@@ -124,6 +130,75 @@ def test_shared_producer_stop_joins_cleanly():
     camera.disconnect()
     assert shared._thread is not None
     assert shared._thread.is_alive() is False
+
+
+def _collect_consumer(received: list, lock: threading.Lock):
+    """Return a consumer callback that records successful frames thread-safely."""
+    def consume(success, frame):
+        if success and frame is not None:
+            with lock:
+                received.append(frame)
+    return consume
+
+
+def _wait_for(predicate, deadline: float = 2.0) -> None:
+    """Poll `predicate` until true or `deadline` seconds elapse."""
+    end = time.time() + deadline
+    while time.time() < end and not predicate():
+        time.sleep(0.02)
+
+
+def test_producer_consumer_start_stop_lifecycle():
+    camera = MockCapture()
+    received: list = []
+    lock = threading.Lock()
+
+    pc = ProducerConsumer(camera, _collect_consumer(received, lock))
+    pc.start()
+    _wait_for(lambda: bool(received))
+    pc.stop(join=True, timeout=2.0)
+
+    # Both threads exist and have been joined to completion within the timeout.
+    assert pc.producer_thread is not None and pc.consumer_thread is not None
+    assert not pc.producer_thread.is_alive()
+    assert not pc.consumer_thread.is_alive()
+    # The consumer actually received frames.
+    with lock:
+        assert len(received) >= 1
+
+
+def test_producer_consumer_context_manager_stops_on_exit():
+    camera = MockCapture()
+    received: list = []
+    lock = threading.Lock()
+
+    with ProducerConsumer(camera, _collect_consumer(received, lock)) as pc:
+        _wait_for(lambda: bool(received))
+
+    # __exit__ stopped and joined both threads.
+    assert not pc.producer_thread.is_alive()
+    assert not pc.consumer_thread.is_alive()
+    with lock:
+        assert len(received) >= 1
+
+
+def test_create_producer_consumer_pair_returns_thread_and_event():
+    camera = MockCapture()
+    received: list = []
+    lock = threading.Lock()
+
+    producer_thread, stop_event = create_producer_consumer_pair(
+        camera, _collect_consumer(received, lock)
+    )
+    assert isinstance(producer_thread, threading.Thread)
+    assert isinstance(stop_event, threading.Event)
+
+    _wait_for(lambda: bool(received))
+    stop_event.set()
+    producer_thread.join(timeout=2.0)
+    assert not producer_thread.is_alive()
+    with lock:
+        assert len(received) >= 1
 
 
 def test_mock_capture_satisfies_protocol():

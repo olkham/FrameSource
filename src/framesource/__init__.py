@@ -7,6 +7,7 @@ from .threading_utils import (
     FrameProducer,
     multiprocess_frame_producer,
     create_producer_consumer_pair,
+    ProducerConsumer,
     AsyncFrameSource,
     SharedProducer,
 )
@@ -71,6 +72,7 @@ __all__ = [
     'FrameProducer',
     'multiprocess_frame_producer',
     'create_producer_consumer_pair',
+    'ProducerConsumer',
     'AsyncFrameSource',
     'SharedProducer',
     'WebcamCapture',

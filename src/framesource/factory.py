@@ -14,9 +14,12 @@ Usage:
     frame = capture.read()
 """
 
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal, Union
+from pathlib import Path
 import importlib
+import json
 import logging
+import os
 import warnings
 
 logger = logging.getLogger(__name__)
@@ -29,7 +32,7 @@ def _warn_deprecated_param(old: str, new: str) -> None:
     warnings.warn(message, DeprecationWarning, stacklevel=3)
 
 from .sources.video_capture_base import VideoCaptureBase
-from .errors import UnknownSourceTypeError
+from .errors import MissingDependencyError, UnknownSourceTypeError
 
 # Import capture classes with graceful handling for missing optional
 # dependencies (e.g. vendor SDKs). Each entry maps a factory key to its module
@@ -157,6 +160,78 @@ class FrameSourceFactory:
         return cc
 
     @classmethod
+    def from_config(cls, config: Union[Dict[str, Any], str, os.PathLike]) -> VideoCaptureBase:
+        """Create a capture instance from a configuration dict or file.
+
+        The configuration supplies ``source_type`` and (optionally)
+        ``source_id`` plus any additional keyword arguments understood by
+        :meth:`create` (including ``connect``). Every key other than
+        ``source_type`` and ``source_id`` is forwarded to :meth:`create`
+        unchanged.
+
+        Args:
+            config: Either a mapping of configuration values, or a path (``str``
+                or :class:`os.PathLike`) to a ``.json``, ``.yaml`` or ``.yml``
+                file containing that mapping. A dict argument is never mutated.
+
+        Returns:
+            VideoCaptureBase: The configured capture instance.
+
+        Raises:
+            MissingDependencyError: If a ``.yaml``/``.yml`` file is given but
+                PyYAML is not installed.
+            ValueError: If a file with an unsupported extension is given.
+            FileNotFoundError: If the given path does not exist.
+            UnknownSourceTypeError: If ``source_type`` is missing or unknown.
+
+        Example:
+            ```python
+            from framesource import FrameSourceFactory
+
+            # From an in-memory dict:
+            cap = FrameSourceFactory.from_config({
+                "source_type": "webcam",
+                "source_id": 0,
+                "connect": False,
+            })
+
+            # From a JSON or YAML file:
+            cap = FrameSourceFactory.from_config("camera.json")
+            ```
+        """
+        if isinstance(config, (str, os.PathLike)):
+            config = cls._read_config_file(config)
+
+        # Shallow-copy so the caller's dict is never mutated.
+        params = dict(config)
+        source_type = params.pop('source_type', None)
+        source_id = params.pop('source_id', None)
+        return cls.create(source_type, source_id=source_id, **params)
+
+    @staticmethod
+    def _read_config_file(path: Union[str, os.PathLike]) -> Dict[str, Any]:
+        """Load a config mapping from a ``.json``, ``.yaml`` or ``.yml`` file."""
+        path = Path(path)
+        suffix = path.suffix.lower()
+        if suffix == '.json':
+            with open(path, 'r', encoding='utf-8') as fh:
+                return json.load(fh)
+        if suffix in ('.yaml', '.yml'):
+            try:
+                import yaml
+            except ImportError:
+                raise MissingDependencyError(
+                    'pyyaml', extra=None,
+                    details='required to load .yaml config files',
+                )
+            with open(path, 'r', encoding='utf-8') as fh:
+                return yaml.safe_load(fh)
+        raise ValueError(
+            f"Unsupported config file extension: {path.suffix!r} "
+            "(expected .json, .yaml or .yml)"
+        )
+
+    @classmethod
     def register_capture_type(cls, name: str, capture_class: type):
         """
         Register a new capture type.
@@ -215,28 +290,3 @@ class FrameSourceFactory:
             raise UnknownSourceTypeError(f"Capture type '{capture_type}' is not registered")
         del cls._capture_types[capture_type]
         logger.info(f"Unregistered capture type: {capture_type}")
-
-
-if __name__ == "__main__":
-    # Simple test to demonstrate functionality
-    print("FrameSourceFactory Test")
-    print("=" * 80)
-    
-    # Test 1: Import the package
-    print("\n1️⃣ Testing package import...")
-    try:
-        import framesource
-        print(f"   ✅ Package imported successfully")
-    except Exception as e:
-        print(f"   ❌ Failed: {e}")
-        exit(1)
-    
-    # Test 2: Check FrameSourceFactory available types
-    print("\n2⃣ Testing FrameSourceFactory available types...")
-    try:
-        from framesource import FrameSourceFactory
-        available_types = FrameSourceFactory.get_available_types()
-        print(f"   ✅ Available types: {available_types}")
-    except Exception as e:
-        print(f"   ❌ Failed: {e}")
-        exit(1)

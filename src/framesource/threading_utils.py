@@ -281,7 +281,7 @@ def multiprocess_frame_producer(source_config: dict, frame_queue, stop_event):
         import multiprocessing
         from framesource.threading_utils import multiprocess_frame_producer
         
-        source_config = {'source': 0, 'width': 640, 'height': 480}
+        source_config = {'source_id': 0, 'width': 640, 'height': 480}
         frame_queue = multiprocessing.Queue(maxsize=10)
         stop_event = multiprocessing.Event()
         
@@ -335,65 +335,166 @@ def multiprocess_frame_producer(source_config: dict, frame_queue, stop_event):
         logger.info("Multiprocess producer finished. Frames sent: %s", frames_sent)
 
 
+class ProducerConsumer:
+    """Explicit producer/consumer pair with a handle to both threads.
+
+    A single daemon producer thread reads frames from a capture source into a
+    bounded queue, while a daemon consumer thread pulls each ``(success, frame)``
+    tuple off the queue and passes it to ``consumer_function``. Unlike the
+    convenience :func:`create_producer_consumer_pair` (which only hands back the
+    producer thread), this class exposes *both* threads plus the shared
+    :attr:`stop_event`, so callers can join and shut the pair down cleanly.
+
+    Concurrency is entirely opt-in: constructing the object starts nothing. Call
+    :meth:`start` explicitly, or use the object as a context manager (which
+    starts on entry and stops on exit).
+
+    Attributes:
+        producer_thread (Optional[threading.Thread]): The producer thread, or
+            None before :meth:`start` has been called.
+        consumer_thread (Optional[threading.Thread]): The consumer thread, or
+            None before :meth:`start` has been called.
+        stop_event (threading.Event): Set to signal both threads to stop.
+
+    Example:
+        ```python
+        from framesource import WebcamCapture
+        from framesource.threading_utils import ProducerConsumer
+
+        def my_processor(success, frame):
+            if success:
+                cv2.imshow("Frame", frame)
+                cv2.waitKey(1)
+
+        camera = WebcamCapture(source=0)
+        with ProducerConsumer(camera, my_processor, target_fps=30) as pc:
+            time.sleep(10)  # threads run; __exit__ stops and joins them
+        ```
+    """
+
+    def __init__(self, capture_source: FrameSourceProtocol, consumer_function: Callable,
+                 max_queue_size: int = 10, target_fps: Optional[float] = None):
+        """Initialize the producer/consumer pair (does not start any thread).
+
+        Args:
+            capture_source: FrameSource capture object to read from.
+            consumer_function: Callable invoked as ``consumer_function(success,
+                frame)`` for each frame pulled off the queue.
+            max_queue_size: Maximum size of the frame queue.
+            target_fps: Target frame rate for the producer (None = unlimited).
+        """
+        self.capture_source = capture_source
+        self.consumer_function = consumer_function
+        self.max_queue_size = max_queue_size
+        self.target_fps = target_fps
+
+        self._frame_queue: Optional[queue.Queue] = None
+        self.stop_event = threading.Event()
+        self.producer_thread: Optional[threading.Thread] = None
+        self.consumer_thread: Optional[threading.Thread] = None
+
+    def _consumer_loop(self) -> None:
+        """Internal consumer loop: pull frames and dispatch to the callback."""
+        assert self._frame_queue is not None
+        while not self.stop_event.is_set():
+            try:
+                success, frame = self._frame_queue.get(timeout=0.1)
+                self.consumer_function(success, frame)
+            except queue.Empty:
+                continue
+
+    def start(self) -> None:
+        """Start (or restart) the producer and consumer threads.
+
+        No-op with a warning if the pair is already running. A fresh queue and
+        :attr:`stop_event` are created on each start so the pair can be reused
+        after :meth:`stop`.
+        """
+        if self.producer_thread and self.producer_thread.is_alive():
+            logger.warning("ProducerConsumer already running")
+            return
+
+        self._frame_queue = queue.Queue(maxsize=self.max_queue_size)
+        self.stop_event = threading.Event()
+
+        self.producer_thread = threading.Thread(
+            target=simple_frame_producer,
+            args=(self.capture_source, self._frame_queue, self.stop_event, self.target_fps),
+            daemon=True,
+        )
+        self.consumer_thread = threading.Thread(target=self._consumer_loop, daemon=True)
+
+        self.producer_thread.start()
+        self.consumer_thread.start()
+        logger.info("Started ProducerConsumer (queue_size=%s, fps=%s)",
+                    self.max_queue_size, self.target_fps)
+
+    def stop(self, join: bool = True, timeout: Optional[float] = None) -> None:
+        """Signal both threads to stop.
+
+        Args:
+            join: If True (default), join both threads after signalling.
+            timeout: Per-thread join timeout in seconds (None = block until the
+                thread exits). Ignored when ``join`` is False.
+        """
+        self.stop_event.set()
+        if join:
+            if self.producer_thread:
+                self.producer_thread.join(timeout=timeout)
+            if self.consumer_thread:
+                self.consumer_thread.join(timeout=timeout)
+
+    def __enter__(self) -> "ProducerConsumer":
+        if not (self.producer_thread and self.producer_thread.is_alive()):
+            self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.stop(join=True)
+
+
 def create_producer_consumer_pair(capture_source: FrameSourceProtocol, consumer_function: Callable,
                                  max_queue_size: int = 10, target_fps: Optional[float] = None):
     """
     Convenience function to create a producer-consumer pair.
-    
+
+    Thin wrapper around :class:`ProducerConsumer` that starts the pair and
+    returns just the producer thread and stop event. For a handle on *both*
+    threads (e.g. to join the consumer) use :class:`ProducerConsumer` directly.
+
     Args:
         capture_source: FrameSource capture object
         consumer_function: Function that processes frames (receives success, frame)
         max_queue_size: Maximum queue size
         target_fps: Target frame rate
-    
+
     Returns:
         Tuple of (producer_thread, stop_event) for control
-    
+
     Example:
         ```python
         def my_processor(success, frame):
             if success:
                 cv2.imshow("Frame", frame)
                 cv2.waitKey(1)
-        
+
         camera = WebcamCapture(source=0)
         producer_thread, stop_event = create_producer_consumer_pair(
             camera, my_processor, max_queue_size=5, target_fps=30
         )
-        
+
         # Let it run for a while
         time.sleep(10)
-        
+
         # Stop it
         stop_event.set()
         producer_thread.join()
         ```
     """
-    frame_queue = queue.Queue(maxsize=max_queue_size)
-    stop_event = threading.Event()
-    
-    def consumer_loop():
-        while not stop_event.is_set():
-            try:
-                success, frame = frame_queue.get(timeout=0.1)
-                consumer_function(success, frame)
-            except queue.Empty:
-                continue
-    
-    # Start producer
-    producer_thread = threading.Thread(
-        target=simple_frame_producer,
-        args=(capture_source, frame_queue, stop_event, target_fps),
-        daemon=True
-    )
-    
-    # Start consumer
-    consumer_thread = threading.Thread(target=consumer_loop, daemon=True)
-    
-    producer_thread.start()
-    consumer_thread.start()
-
-    return producer_thread, stop_event
+    pair = ProducerConsumer(capture_source, consumer_function,
+                            max_queue_size=max_queue_size, target_fps=target_fps)
+    pair.start()
+    return pair.producer_thread, pair.stop_event
 
 
 class AsyncFrameSource:
