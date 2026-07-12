@@ -39,12 +39,30 @@ The 360° camera example (`examples/camera_360_example.py`) provides an intuitiv
 
 When I work on computer vision, robotics, or video analytics projects, I often need to swap between different sources of frames: a webcam for quick tests, a folder of images for batch processing, a video file for reproducibility, or a specialized camera for deployment. FrameSource lets me do this with minimal code changes—just swap the provider!
 
+## Why not plain OpenCV?
+
+`cv2.VideoCapture` is great, but it only covers webcams, video files, and a handful of streams. The moment you need a Basler/Ximea industrial camera, a RealSense depth stream, a folder of images replayed at a fixed FPS, screen capture, or an audio spectrogram, you end up writing a different integration for each — with different connect/read/release semantics.
+
+FrameSource is a thin **adapter layer** that gives every one of those sources the same `connect()` / `read()` / `disconnect()` contract (and an OpenCV-compatible `isOpened()` / `read()` surface), so your downstream processing code never has to care where frames come from. You opt into the heavier backends only when you install the matching extra.
+
+## Design Goals
+
+- **One interface, many sources** — identical `connect()`/`read()`/`disconnect()` contract across every backend, validated by a runtime-checkable `FrameSourceProtocol`.
+- **Synchronous and predictable** — `read()` is a plain blocking call. No hidden background threads, no shared mutable frame buffers inside the capture objects.
+- **Bring-your-own concurrency** — when you want threading or multiprocessing, opt in explicitly with the helpers in `framesource.threading_utils` so the threading model stays visible and under your control.
+
+## Non-Goals
+
+- **Frame-accurate multi-source synchronization** — FrameSource does not hardware-sync or timestamp-align multiple cameras for you.
+- **High-throughput zero-copy pipelines** — it favours a simple, readable API over squeezing out maximum FPS or avoiding every copy.
+- **GPU-first decoding** — decoding uses the backend's defaults (mostly CPU/OpenCV); it is not a CUDA/NVDEC acceleration layer.
+
 ## Features ✨
 
 - Unified interface for all frame sources (cameras, video files, image folders, screen capture, audio spectrograms)
 - Built-in frame processors for specialized transformations (360° equirectangular to pinhole projection)
 - Easily extensible with new capture types and processing modules
-- Threaded/background capture support for smooth frame acquisition
+- Optional external threading/multiprocessing helpers (`framesource.threading_utils`) for smooth, decoupled frame acquisition
 - Control over exposure, gain, resolution, FPS (where supported by the source)
 - Real-time playback and looping for video and image folders
 - Simple factory pattern for instantiating sources
@@ -212,13 +230,24 @@ cap.disconnect()
 # Folder of images
 cap = FrameSourceFactory.create('folder', source='media/image_seq', sort_by='date', fps=10, loop=True)
 cap.connect()
-cap.start_async()  # For background capture
 while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
         break
 cap.disconnect()
 ```
+
+Sources are also iterable — the loop above can be written as:
+
+```python
+with FrameSourceFactory.create('video_file', source_id='media/demo.mp4', connect=False) as cap:
+    for frame in cap:           # yields Frame objects until the source is exhausted
+        process(frame)
+```
+
+Each `frame` is a `Frame` — a `numpy.ndarray` subclass that works in any
+OpenCV/numpy call and carries `timestamp` (wall clock), `monotonic` (for
+latency/FPS math), `count`, `uuid`, `source`, and a free-form `metadata` dict.
 
 ### 2. Direct Use
 
@@ -258,7 +287,6 @@ cap.disconnect()
 from framesource.sources.screen_capture import ScreenCapture
 cap = ScreenCapture(x=100, y=100, w=800, h=600, fps=30)
 cap.connect()
-cap.start_async()  # For background capture (optional)
 while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
@@ -277,7 +305,6 @@ cap = FrameSourceFactory.create('audio_spectrogram',
                               freq_range=(20, 8000),
                               colormap=cv2.COLORMAP_VIRIDIS)
 cap.connect()
-cap.start_async()  # Start background audio processing
 while cap.is_connected:
     ret, frame = cap.read()
     if not ret:
@@ -297,6 +324,152 @@ while cap.is_connected:
         break
 cap.disconnect()
 ```
+
+## Concurrency (External Threading) 🧵
+
+Capture objects are **synchronous**: `read()` blocks until the next frame is ready and the source never spins up hidden background threads. When you want to decouple frame acquisition from processing, you opt in explicitly with the helpers in `framesource.threading_utils`. This keeps the threading model visible and under your control.
+
+### Quickest: a producer thread feeding a queue
+
+```python
+import queue, threading
+from framesource import FrameSourceFactory
+from framesource.threading_utils import simple_frame_producer
+
+camera = FrameSourceFactory.create('webcam', source=0)
+camera.connect()
+
+frame_queue = queue.Queue(maxsize=10)
+stop_event = threading.Event()
+
+producer = threading.Thread(
+    target=simple_frame_producer,
+    args=(camera, frame_queue, stop_event, 30),  # target 30 FPS
+    daemon=True,
+)
+producer.start()
+
+try:
+    while True:
+        ret, frame = frame_queue.get(timeout=1.0)
+        if not ret:
+            continue
+        # ... process / display frame ...
+finally:
+    stop_event.set()
+    producer.join(timeout=2)
+    camera.disconnect()
+```
+
+### Managed: `FrameProducer` with built-in stats
+
+```python
+from framesource import FrameSourceFactory
+from framesource.threading_utils import FrameProducer
+
+camera = FrameSourceFactory.create('webcam', source=0)
+camera.connect()
+
+producer = FrameProducer(camera, max_queue_size=10, target_fps=30)
+producer.start()
+
+try:
+    while True:
+        ret, frame = producer.get_frame(timeout=1.0)
+        if not ret:
+            continue
+        # ... process / display frame ...
+finally:
+    producer.stop()
+    print(producer.get_stats())  # frames_captured, frames_dropped, fps, avg_latency, ...
+    camera.disconnect()
+```
+
+### Heavier workloads: multiprocessing
+
+For CPU-bound consumers you can move acquisition into a separate process. `multiprocess_frame_producer` takes a plain source-config dict and builds the capture inside the child process:
+
+```python
+import multiprocessing as mp
+from framesource.threading_utils import multiprocess_frame_producer
+
+source_config = {'capture_type': 'webcam', 'source': 0}
+frame_queue = mp.Queue(maxsize=10)
+stop_event = mp.Event()
+
+worker = mp.Process(
+    target=multiprocess_frame_producer,
+    args=(source_config, frame_queue, stop_event),
+    daemon=True,
+)
+worker.start()
+
+try:
+    while True:
+        ret, frame = frame_queue.get(timeout=1.0)
+        if not ret:
+            continue
+        # ... process frame ...
+finally:
+    stop_event.set()
+    worker.join(timeout=2)
+```
+
+### Sharing one camera between consumers: `SharedProducer`
+
+A physical camera can only be opened once, but a UI preview, a recorder, and a
+network stream may all want its frames. `SharedProducer` is the explicit way to
+fan one source out to many consumers — one visible producer thread, one queue
+per subscriber, no hidden global state:
+
+```python
+from framesource import FrameSourceFactory, SharedProducer
+
+camera = FrameSourceFactory.create('webcam', source_id=0, connect=False)
+
+producer = SharedProducer(camera, target_fps=30)
+ui_queue = producer.subscribe(maxsize=5)        # subscribe before or after start()
+recorder_queue = producer.subscribe(maxsize=30)
+producer.start()                                 # connects the source if needed
+
+# ... each consumer drains its own queue at its own pace ...
+ret, frame = ui_queue.get(timeout=1.0)
+
+producer.stop()          # stops the producer thread
+camera.disconnect()      # you own the source lifecycle
+```
+
+### asyncio: `AsyncFrameSource`
+
+For async applications, wrap any source in `AsyncFrameSource` — reads are
+offloaded to a dedicated single worker thread so the event loop never blocks,
+and the capture core stays fully synchronous:
+
+```python
+import asyncio
+from framesource import FrameSourceFactory, AsyncFrameSource
+
+async def main():
+    camera = FrameSourceFactory.create('webcam', source_id=0, connect=False)
+    async with AsyncFrameSource(camera) as source:
+        for _ in range(100):
+            ret, frame = await source.read()
+
+asyncio.run(main())
+```
+
+### Waiting for a stream to become ready
+
+Network sources (RTSP/HTTP) can report "connected" before they actually
+deliver frames. `wait_until_ready()` polls until the first frame arrives:
+
+```python
+cap = FrameSourceFactory.create('ipcam', source_id='rtsp://...', connect=True)
+if not cap.wait_until_ready(timeout=10.0):
+    raise RuntimeError("stream connected but produced no frames")
+```
+
+> See `examples/threading_utils_examples.py` and `examples/multiple_cameras_external_threading.py` for complete runnable demos.
 
 ## Frame Processors 🔄
 
@@ -399,6 +572,33 @@ Want to add a new camera or source? Just subclass `VideoCaptureBase` and registe
 from framesource import FrameSourceFactory
 FrameSourceFactory.register_capture_type('my_camera', MyCameraCapture)
 ```
+
+You don't have to inherit from `VideoCaptureBase` to work with the concurrency
+helpers, though. Anything that structurally satisfies `FrameSourceProtocol`
+(`connect()`, `disconnect()`, `read()`, `is_open()`) is accepted by
+`simple_frame_producer`, `FrameProducer`, `SharedProducer`, and
+`AsyncFrameSource` — the protocol is `runtime_checkable`, so
+`isinstance(obj, FrameSourceProtocol)` also works:
+
+```python
+from framesource import FrameSourceProtocol
+
+def run(source: FrameSourceProtocol) -> None:
+    source.connect()
+    ret, frame = source.read()
+    ...
+```
+
+### Error handling
+
+`read()` keeps the OpenCV-style `(ret, frame)` contract — it never raises for
+an ordinary failed read. Structured exceptions (all subclasses of
+`framesource.FrameSourceError`) are raised only for setup problems, and they
+multiple-inherit from the builtin you would already be catching:
+
+- `MissingDependencyError` (also an `ImportError`) — an optional SDK/extra is
+  not installed; the message names the exact `pip install framesource[extra]`.
+- `UnknownSourceTypeError` (also a `ValueError`) — unknown factory source type.
 
 ### Adding New Frame Processors
 
