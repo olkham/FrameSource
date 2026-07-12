@@ -3,16 +3,19 @@ import numpy as np
 import logging
 import platform
 from .video_capture_base import VideoCaptureBase
+from ..errors import MissingDependencyError
 
 logger = logging.getLogger(__name__)
 
 # The Huateng/MindVision SDK loads a vendor driver DLL at import time, which is
 # only present when the camera drivers are installed. Guard the import so the
 # module can still be imported (and the class referenced) without the SDK.
+_MVSDK_IMPORT_ERROR: Optional[str] = None
 try:
     from . import mvsdk
 except (ImportError, OSError) as e:
     mvsdk = None
+    _MVSDK_IMPORT_ERROR = str(e)
     logger.warning(f"Huateng mvsdk SDK unavailable: {e}")
 
 class HuatengCapture(VideoCaptureBase):
@@ -21,7 +24,23 @@ class HuatengCapture(VideoCaptureBase):
 
     """Huateng camera capture using mvsdk."""
 
-    def __init__(self, source: Any = None, **kwargs):
+    def __init__(self, source: Any = None, *, is_mono: Optional[bool] = None, **kwargs):
+        """Initialize the Huateng (MindVision) capture.
+
+        Args:
+            source: Reserved for future multi-device selection; the first
+                enumerated camera is currently always used regardless of
+                this value.
+            is_mono: Stored for parity with other vendor sources (default:
+                False). Whether the stream is mono or color is auto-detected
+                from the device capability in :meth:`connect`, so this flag
+                currently has no effect.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
+        # Preserve the historical ``self.config`` contents: only forward an
+        # explicitly-provided value.
+        if is_mono is not None:
+            kwargs['is_mono'] = is_mono
         super().__init__(source, **kwargs)
         self.hCamera = -1
         self.nDev = 0
@@ -29,7 +48,7 @@ class HuatengCapture(VideoCaptureBase):
         self.pFrameBuffer = None
         self.frame = None
         self.DevInfo = None
-        self.is_mono = kwargs.get('is_mono', False)
+        self.is_mono = self.config.get('is_mono', False)
         self.current_exp = 0
         self.current_gain = 0
         self.prop_frame_height = None
@@ -38,6 +57,12 @@ class HuatengCapture(VideoCaptureBase):
         self.read_count = 0
 
     def connect(self) -> bool:
+        if mvsdk is None:
+            raise MissingDependencyError(
+                'mvsdk (Huateng/MindVision SDK)',
+                extra=None,
+                details=_MVSDK_IMPORT_ERROR,
+            )
         try:
             self.DevList = mvsdk.CameraEnumerateDevice()
             self.nDev = len(self.DevList)

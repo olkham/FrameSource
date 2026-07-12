@@ -7,6 +7,7 @@ import warnings
 
 from .video_capture_base import VideoCaptureBase
 from ..processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
+from ..errors import MissingDependencyError
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,38 @@ class RealsenseCapture(VideoCaptureBase):
 
     """Realsense camera capture using Realsense lib."""
 
-    def __init__(self, source: int = 0, **kwargs):
+    def __init__(self, source: int = 0, *, width: Optional[int] = None,
+                 height: Optional[int] = None, fps: Optional[float] = None,
+                 processor: Optional[Any] = None, **kwargs):
+        """Initialize the RealSense capture.
+
+        Args:
+            source: Camera serial number (str) or device index (int,
+                default: 0).
+            width: Desired color-stream width in pixels. Falls back to the
+                device's maximum supported width when omitted (default:
+                None). Applied on :meth:`connect`.
+            height: Desired color-stream height in pixels. Falls back to the
+                device's maximum supported height when omitted (default:
+                None). Applied on :meth:`connect`.
+            fps: Desired stream frame rate. Falls back to the device's
+                maximum supported frame rate when omitted (default: None).
+                Applied on :meth:`connect`.
+            processor: Frame processor attached at construction time.
+                Defaults to a
+                :class:`~framesource.processors.realsense_depth_processor.RealsenseDepthProcessor`
+                configured for RGB output when not provided.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
+        # Preserve the historical ``self.config`` contents: only forward
+        # explicitly-provided values so the ``self.config.get(...)`` defaults
+        # below keep their old meaning.
+        for _key, _val in (
+            ('width', width), ('height', height), ('fps', fps),
+            ('processor', processor),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.pipeline = None
         self.device = None
@@ -89,7 +121,10 @@ class RealsenseCapture(VideoCaptureBase):
         """Connect to realsense camera."""
         try:
             import pyrealsense2 as rs
+        except ImportError as e:
+            raise MissingDependencyError('pyrealsense2', extra='realsense', details=str(e)) from e
 
+        try:
             # Configure depth and color streams
             self.pipeline = rs.pipeline()
             self._align = rs.align(rs.stream.color)

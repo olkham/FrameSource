@@ -4,6 +4,7 @@ import logging
 import warnings
 
 from .video_capture_base import VideoCaptureBase
+from ..errors import MissingDependencyError
 
 logger = logging.getLogger(__name__)
 
@@ -13,19 +14,51 @@ class BaslerCapture(VideoCaptureBase):
     supports_gain = True
 
     """Basler camera capture using pypylon."""
-    
-    def __init__(self, source: Any = None, **kwargs):
+
+    def __init__(self, source: Any = None, *, is_mono: Optional[bool] = None,
+                 exposure: Optional[float] = None, gain: Optional[float] = None,
+                 width: Optional[int] = None, height: Optional[int] = None,
+                 **kwargs):
+        """Initialize the Basler capture.
+
+        Args:
+            source: Camera serial number (str) or device index (int,
+                default: 0).
+            is_mono: Configure the camera for monochrome (``Mono8``) output
+                instead of BGR8 (default: False). Applied on :meth:`connect`.
+            exposure: Initial exposure time in microseconds. Applied on
+                :meth:`connect` when provided.
+            gain: Initial gain in dB. Applied on :meth:`connect` when
+                provided.
+            width: Desired frame width in pixels. Applied on :meth:`connect`
+                (together with ``height``) when provided.
+            height: Desired frame height in pixels. Applied on
+                :meth:`connect` (together with ``width``) when provided.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+
+        Raises:
+            MissingDependencyError: If the ``pypylon`` package is not
+                installed.
+        """
+        # Preserve the historical ``self.config`` contents: only forward
+        # explicitly-provided values so the ``'width' in self.config`` style
+        # presence checks in connect() keep their old meaning.
+        for _key, _val in (
+            ('is_mono', is_mono), ('exposure', exposure), ('gain', gain),
+            ('width', width), ('height', height),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.camera = None
         self.converter = None
         try:
             from pypylon import pylon
             self.pylon = pylon
-        except ImportError:
-            logger.error("pypylon module not available. Install pypylon package.")
-            self.pylon = None
-        
-        self.is_mono = kwargs.get('is_mono', False)
+        except ImportError as e:
+            raise MissingDependencyError('pypylon', extra='basler', details=str(e)) from e
+
+        self.is_mono = self.config.get('is_mono', False)
         self.serial_number = source if isinstance(source, str) else None
         self.device_index = source if isinstance(source, int) else 0
     

@@ -1,11 +1,12 @@
 import logging
 import os
 import warnings
-from typing import Optional, Tuple, Any, Dict
+from typing import Optional, Tuple, Any, Dict, List
 
 import numpy as np
 
 from .video_capture_base import VideoCaptureBase
+from ..errors import MissingDependencyError
 
 logger = logging.getLogger(__name__)
 
@@ -224,21 +225,73 @@ class GenicamCapture(VideoCaptureBase):
             return False, None
 
     """Genicam camera capture using genicam."""
-    def __init__(self, source: Any = None, **kwargs):
+    def __init__(self, source: Any = None, *, is_mono: Optional[bool] = None,
+                 cti_files: Optional[List[str]] = None,
+                 exposure: Optional[float] = None, gain: Optional[float] = None,
+                 width: Optional[int] = None, height: Optional[int] = None,
+                 x: Optional[int] = None, y: Optional[int] = None,
+                 fps: Optional[float] = None,
+                 acquisition_framerate: Optional[float] = None,
+                 **kwargs):
+        """Initialize the GenICam capture.
+
+        Args:
+            source: Camera serial number (str) or device index (int).
+            is_mono: Stored for parity with other vendor sources (default:
+                False). GenICam pixel format is currently negotiated
+                automatically in :meth:`connect`, so this flag has no
+                effect yet.
+            cti_files: GenTL producer (``.cti``) file paths to load, in
+                addition to any discovered via the ``GENICAM_GENTL64_PATH``
+                environment variable. Applied on :meth:`connect` when
+                provided.
+            exposure: Initial exposure time in microseconds. Applied on
+                :meth:`connect` when provided.
+            gain: Initial gain in dB. Applied on :meth:`connect` when
+                provided.
+            width: Desired frame width in pixels. Applied on :meth:`connect`
+                (together with ``height``) when provided.
+            height: Desired frame height in pixels. Applied on
+                :meth:`connect` (together with ``width``) when provided.
+            x: Desired horizontal offset in pixels. Applied on
+                :meth:`connect` when ``x`` or ``y`` is provided.
+            y: Desired vertical offset in pixels. Applied on :meth:`connect`
+                when ``x`` or ``y`` is provided.
+            fps: Target frame rate, stored on ``self.fps`` (default: 60 when
+                not provided).
+            acquisition_framerate: Frame rate applied via :meth:`set_fps` on
+                :meth:`connect` when provided.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+
+        Raises:
+            MissingDependencyError: If the ``harvesters`` package is not
+                installed.
+        """
+        # Preserve the historical ``self.config`` contents: only forward
+        # explicitly-provided values so the ``'width' in self.config`` style
+        # presence checks in connect() keep their old meaning.
+        for _key, _val in (
+            ('is_mono', is_mono), ('cti_files', cti_files),
+            ('exposure', exposure), ('gain', gain),
+            ('width', width), ('height', height),
+            ('x', x), ('y', y), ('fps', fps),
+            ('acquisition_framerate', acquisition_framerate),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.camera = None
         self.converter = None
         try:
             from harvesters.core import Harvester
             self.h = Harvester()
-        except ImportError:
-            logger.error("Harvesters module not available. Install Harvesters package.")
-            self.h = None
+        except ImportError as e:
+            raise MissingDependencyError('harvesters', extra='genicam', details=str(e)) from e
 
-        self.is_mono = kwargs.get('is_mono', False)
+        self.is_mono = self.config.get('is_mono', False)
         self.serial_number = source if isinstance(source, str) else None
         self.device_index = source if isinstance(source, int) else 0
-        self.fps = self.config.get("fps",60)
+        self.fps = self.config.get("fps", 60)
 
     def try_set_node_param(self, container, param_name, attr_name, value):
         try:

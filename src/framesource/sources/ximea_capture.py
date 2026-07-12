@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 import numpy as np
 import logging
 from .video_capture_base import VideoCaptureBase
+from ..errors import MissingDependencyError
 
 logger = logging.getLogger(__name__)
 
@@ -11,17 +12,52 @@ class XimeaCapture(VideoCaptureBase):
 
     """Ximea camera capture using xiapi."""
 
-    def __init__(self, source: int = 0, **kwargs):
+    def __init__(self, source: int = 0, *, is_mono: Optional[bool] = None,
+                 exposure: Optional[float] = None, gain: Optional[float] = None,
+                 **kwargs):
+        """Initialize the Ximea capture.
+
+        Args:
+            source: Camera device index (default: 0).
+            is_mono: Configure the camera for monochrome (``XI_MONO8``)
+                output instead of ``XI_RGB24`` (default: False). Applied on
+                :meth:`connect`.
+            exposure: Initial exposure time in microseconds. Applied on
+                :meth:`connect` when provided (overrides the 10ms default).
+            gain: Initial gain in dB. Applied on :meth:`connect` when
+                provided.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+
+        Raises:
+            MissingDependencyError: If the ``ximea`` (xiapi) package is not
+                installed.
+        """
+        # Preserve the historical ``self.config`` contents: only forward
+        # explicitly-provided values so the ``'exposure' in self.config``
+        # style presence checks in connect() keep their old meaning.
+        for _key, _val in (
+            ('is_mono', is_mono), ('exposure', exposure), ('gain', gain),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.cam = None
         try:
             from ximea import xiapi
             self.xiapi = xiapi
-        except ImportError:
-            logger.error("Ximea xiapi module not available. Install python-ximea package.")
-            self.xiapi = None
+        except ImportError as e:
+            raise MissingDependencyError(
+                'ximea',
+                extra=None,
+                details=(
+                    f"{e}; no pip extra is available for the Ximea xiapi bindings. "
+                    "Download and install the XIMEA Software Package for your OS from "
+                    "https://www.ximea.com/support/wiki/apis/xiapi_manual, which provides "
+                    "the 'ximea' Python module."
+                ),
+            ) from e
 
-        self.is_mono = kwargs.get('is_mono', False)
+        self.is_mono = self.config.get('is_mono', False)
 
     def connect(self) -> bool:
         """Connect to Ximea camera."""
