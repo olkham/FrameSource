@@ -11,8 +11,12 @@ This enables pan/tilt/zoom control over a fisheye camera feed.
 
 import cv2
 import numpy as np
+
 from framesource import FrameSourceFactory
-from framesource.processors import Fisheye2EquirectangularProcessor, Equirectangular2PinholeProcessor
+from framesource.processors import (
+    Equirectangular2PinholeProcessor,
+    Fisheye2EquirectangularProcessor,
+)
 
 
 def main():
@@ -37,11 +41,11 @@ def main():
 
         # Handle mouse wheel for FOV adjustment
         if event == cv2.EVENT_MOUSEWHEEL:
-            current_fov = pinhole_processor.get_parameter('fov') or 90
+            current_fov = pinhole_processor.get_parameter("fov") or 90
             delta = flags
             fov_change = 5 if delta > 0 else -5
             new_fov = max(10, min(120, current_fov + fov_change))
-            pinhole_processor.set_parameter('fov', new_fov)
+            pinhole_processor.set_parameter("fov", new_fov)
             print(f"FOV: {new_fov}°")
             return
 
@@ -52,11 +56,9 @@ def main():
             mouse_dragging = False
 
         # Update angles when clicking or dragging
-        if (event == cv2.EVENT_LBUTTONDOWN or
-            (event == cv2.EVENT_MOUSEMOVE and mouse_dragging)):
-
-            frame_width = param['frame_width']
-            frame_height = param['frame_height']
+        if event == cv2.EVENT_LBUTTONDOWN or (event == cv2.EVENT_MOUSEMOVE and mouse_dragging):
+            frame_width = param["frame_width"]
+            frame_height = param["frame_height"]
 
             # Convert pixel coordinates to spherical coordinates
             longitude_deg, latitude_deg = pinhole_processor.pixel_to_spherical(
@@ -66,20 +68,20 @@ def main():
             # For fisheye, limit yaw to ±90° (front hemisphere)
             longitude_deg = max(-90, min(90, longitude_deg))
 
-            current_roll = pinhole_processor.get_parameter('roll') or 0.0
+            current_roll = pinhole_processor.get_parameter("roll") or 0.0
             yaw, pitch, roll = pinhole_processor.spherical_to_processor_angles(
                 longitude_deg, latitude_deg, current_roll
             )
 
-            pinhole_processor.set_parameter('yaw', yaw)
-            pinhole_processor.set_parameter('pitch', pitch)
+            pinhole_processor.set_parameter("yaw", yaw)
+            pinhole_processor.set_parameter("pitch", pitch)
 
             if event == cv2.EVENT_LBUTTONDOWN:
                 print(f"Look at: yaw={yaw:.1f}°, pitch={pitch:.1f}°")
 
     # Try to connect to a fisheye camera (webcam source 0); auto-connects.
     # For testing, you can also use a fisheye image/video file
-    camera = FrameSourceFactory.create('webcam', source_id=0)
+    camera = FrameSourceFactory.create("webcam", source_id=0)
 
     if not camera.is_connected:
         print("No camera found. Creating a synthetic fisheye test pattern...")
@@ -129,23 +131,21 @@ def main():
     # Create fisheye to equirectangular processor
     fisheye_processor = Fisheye2EquirectangularProcessor(
         output_width=1920,
-        output_height=960  # Standard 2:1 equirectangular aspect ratio
+        output_height=960,  # Standard 2:1 equirectangular aspect ratio
     )
 
     # Create equirectangular to pinhole processor for PTZ control
     pinhole_processor = Equirectangular2PinholeProcessor(
-        output_width=1280,
-        output_height=720,
-        fov=90
+        output_width=1280, output_height=720, fov=90
     )
 
     # Initialize view angles
-    pinhole_processor.set_parameter('pitch', 0.0)
-    pinhole_processor.set_parameter('yaw', 0.0)
-    pinhole_processor.set_parameter('roll', 0.0)
+    pinhole_processor.set_parameter("pitch", 0.0)
+    pinhole_processor.set_parameter("yaw", 0.0)
+    pinhole_processor.set_parameter("roll", 0.0)
 
     # Set up mouse callback
-    mouse_params = {'frame_width': 1920, 'frame_height': 960}
+    mouse_params = {"frame_width": 1920, "frame_height": 960}
     cv2.setMouseCallback("Equirectangular", mouse_callback, mouse_params)
 
     def print_help():
@@ -181,13 +181,13 @@ def main():
         ptz_frame = pinhole_processor.process(equi_frame)
 
         # Update mouse params with actual equirectangular dimensions
-        mouse_params['frame_width'] = equi_frame.shape[1]
-        mouse_params['frame_height'] = equi_frame.shape[0]
+        mouse_params["frame_width"] = equi_frame.shape[1]
+        mouse_params["frame_height"] = equi_frame.shape[0]
 
         # Draw current view direction on equirectangular
-        yaw = pinhole_processor.get_parameter('yaw') or 0
-        pitch = pinhole_processor.get_parameter('pitch') or 0
-        roll = pinhole_processor.get_parameter('roll') or 0
+        yaw = pinhole_processor.get_parameter("yaw") or 0
+        pitch = pinhole_processor.get_parameter("pitch") or 0
+        roll = pinhole_processor.get_parameter("roll") or 0
 
         eq_x, eq_y = pinhole_processor.processor_angles_to_equirectangular_coords(
             yaw, pitch, roll, equi_frame.shape[1], equi_frame.shape[0]
@@ -212,48 +212,48 @@ def main():
         key = cv2.waitKey(1) & 0xFF
         if key == 27:  # ESC
             running = False
-        elif key == ord('h'):
+        elif key == ord("h"):
             print_help()
-        elif key == ord('w'):
-            current_pitch = pinhole_processor.get_parameter('pitch') or 0
-            pinhole_processor.set_parameter('pitch', current_pitch + 5.0)
+        elif key == ord("w"):
+            current_pitch = pinhole_processor.get_parameter("pitch") or 0
+            pinhole_processor.set_parameter("pitch", current_pitch + 5.0)
             print(f"Pitch: {pinhole_processor.get_parameter('pitch'):.1f}°")
-        elif key == ord('s'):
-            current_pitch = pinhole_processor.get_parameter('pitch') or 0
-            pinhole_processor.set_parameter('pitch', current_pitch - 5.0)
+        elif key == ord("s"):
+            current_pitch = pinhole_processor.get_parameter("pitch") or 0
+            pinhole_processor.set_parameter("pitch", current_pitch - 5.0)
             print(f"Pitch: {pinhole_processor.get_parameter('pitch'):.1f}°")
-        elif key == ord('a'):
-            current_yaw = pinhole_processor.get_parameter('yaw') or 0
+        elif key == ord("a"):
+            current_yaw = pinhole_processor.get_parameter("yaw") or 0
             new_yaw = max(-90, current_yaw - 5.0)
-            pinhole_processor.set_parameter('yaw', new_yaw)
+            pinhole_processor.set_parameter("yaw", new_yaw)
             print(f"Yaw: {new_yaw:.1f}°")
-        elif key == ord('d'):
-            current_yaw = pinhole_processor.get_parameter('yaw') or 0
+        elif key == ord("d"):
+            current_yaw = pinhole_processor.get_parameter("yaw") or 0
             new_yaw = min(90, current_yaw + 5.0)
-            pinhole_processor.set_parameter('yaw', new_yaw)
+            pinhole_processor.set_parameter("yaw", new_yaw)
             print(f"Yaw: {new_yaw:.1f}°")
-        elif key == ord('q'):
-            current_roll = pinhole_processor.get_parameter('roll') or 0
-            pinhole_processor.set_parameter('roll', current_roll - 5.0)
+        elif key == ord("q"):
+            current_roll = pinhole_processor.get_parameter("roll") or 0
+            pinhole_processor.set_parameter("roll", current_roll - 5.0)
             print(f"Roll: {pinhole_processor.get_parameter('roll'):.1f}°")
-        elif key == ord('e'):
-            current_roll = pinhole_processor.get_parameter('roll') or 0
-            pinhole_processor.set_parameter('roll', current_roll + 5.0)
+        elif key == ord("e"):
+            current_roll = pinhole_processor.get_parameter("roll") or 0
+            pinhole_processor.set_parameter("roll", current_roll + 5.0)
             print(f"Roll: {pinhole_processor.get_parameter('roll'):.1f}°")
-        elif key == ord('r'):
-            pinhole_processor.set_parameter('pitch', 0.0)
-            pinhole_processor.set_parameter('yaw', 0.0)
-            pinhole_processor.set_parameter('roll', 0.0)
+        elif key == ord("r"):
+            pinhole_processor.set_parameter("pitch", 0.0)
+            pinhole_processor.set_parameter("yaw", 0.0)
+            pinhole_processor.set_parameter("roll", 0.0)
             print("View reset")
-        elif key == ord('+') or key == ord('='):
-            current_fov = pinhole_processor.get_parameter('fov') or 90
+        elif key == ord("+") or key == ord("="):
+            current_fov = pinhole_processor.get_parameter("fov") or 90
             new_fov = min(current_fov + 5, 120)
-            pinhole_processor.set_parameter('fov', new_fov)
+            pinhole_processor.set_parameter("fov", new_fov)
             print(f"FOV: {new_fov}°")
-        elif key == ord('-'):
-            current_fov = pinhole_processor.get_parameter('fov') or 90
+        elif key == ord("-"):
+            current_fov = pinhole_processor.get_parameter("fov") or 90
             new_fov = max(current_fov - 5, 10)
-            pinhole_processor.set_parameter('fov', new_fov)
+            pinhole_processor.set_parameter("fov", new_fov)
             print(f"FOV: {new_fov}°")
 
     # Cleanup

@@ -34,7 +34,6 @@ import numpy as np
 from framesource import FrameSourceFactory
 from framesource.threading_utils import FrameProducer
 
-
 MEDIA_DIR = Path(__file__).resolve().parents[1] / "media"
 
 
@@ -85,9 +84,7 @@ def run(args) -> None:
     """Feed a slow model from a live-paced source and report drop/latency stats."""
     # real_time + loop makes the finite clip behave like an endless live camera
     # delivering frames at its native rate, independent of how fast we consume.
-    cap = FrameSourceFactory.create(
-        "video_file", source_id=demo_video(), real_time=True, loop=True
-    )
+    cap = FrameSourceFactory.create("video_file", source_id=demo_video(), real_time=True, loop=True)
     if not cap.is_open():
         print("Failed to open the demo video source.")
         return
@@ -144,7 +141,9 @@ def run(args) -> None:
     print(f"  avg_latency     : {avg_lat_ms}  (producer stamp -> enqueue)")
     print("\n=== Consumer view ===")
     print(f"  inferences run  : {processed}")
-    print(f"  mean staleness  : {mean_e2e * 1000:.1f} ms  (capture -> model, grows with queue depth)")
+    print(
+        f"  mean staleness  : {mean_e2e * 1000:.1f} ms  (capture -> model, grows with queue depth)"
+    )
     if drop_pct > 10:
         print(
             "\nTakeaway: the model can't keep up, so newest frames are dropped and "
@@ -155,9 +154,15 @@ def run(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--frames", type=int, default=40, help="model inferences to run before stopping")
-    parser.add_argument("--queue", type=int, default=4, help="max_queue_size (small => visible back-pressure)")
-    parser.add_argument("--infer-delay", type=float, default=0.08, help="simulated per-frame inference time (s)")
+    parser.add_argument(
+        "--frames", type=int, default=40, help="model inferences to run before stopping"
+    )
+    parser.add_argument(
+        "--queue", type=int, default=4, help="max_queue_size (small => visible back-pressure)"
+    )
+    parser.add_argument(
+        "--infer-delay", type=float, default=0.08, help="simulated per-frame inference time (s)"
+    )
     args = parser.parse_args()
     run(args)
 

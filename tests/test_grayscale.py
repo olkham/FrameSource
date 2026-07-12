@@ -15,8 +15,9 @@ from framesource.sources.audiospectrogram_capture import AudioSpectrogramCapture
 
 
 def make_capture(**kwargs):
-    return AudioSpectrogramCapture(source=None, n_mels=64, window_duration=1.0,
-                                   frame_rate=10, **kwargs)
+    return AudioSpectrogramCapture(
+        source=None, n_mels=64, window_duration=1.0, frame_rate=10, **kwargs
+    )
 
 
 def test_default_colormap_is_grayscale():

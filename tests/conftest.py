@@ -1,6 +1,6 @@
 """Shared pytest fixtures and a hardware-free MockCapture for FrameSource tests."""
 
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 import pytest
@@ -18,8 +18,14 @@ class MockCapture(VideoCaptureBase):
 
     has_discovery = False
 
-    def __init__(self, source="mock", width: int = 16, height: int = 12,
-                 max_frames: Optional[int] = None, **kwargs):
+    def __init__(
+        self,
+        source="mock",
+        width: int = 16,
+        height: int = 12,
+        max_frames: Optional[int] = None,
+        **kwargs,
+    ):
         super().__init__(source, **kwargs)
         self.width = width
         self.height = height
@@ -37,7 +43,7 @@ class MockCapture(VideoCaptureBase):
         self.is_connected = False
         return True
 
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         if not self.is_connected:
             return False, None
         if self.max_frames is not None and self._reads >= self.max_frames:
@@ -66,7 +72,7 @@ class MockCapture(VideoCaptureBase):
     def get_gain(self) -> Optional[float]:
         return self._gain
 
-    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+    def get_frame_size(self) -> Optional[tuple[int, int]]:
         return (self.width, self.height)
 
 

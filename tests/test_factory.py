@@ -1,10 +1,9 @@
 """FrameSourceFactory behaviour tests using the hardware-free MockCapture."""
 
 import pytest
+from conftest import MockCapture
 
 from framesource import FrameSourceFactory
-
-from conftest import MockCapture
 
 MOCK_TYPE = "mock"
 
@@ -46,8 +45,9 @@ def test_deprecated_capture_type_param_warns_and_works():
 
 def test_kwarg_capture_type_and_source_still_work():
     with pytest.warns(DeprecationWarning):
-        cap = FrameSourceFactory.create(**{"capture_type": MOCK_TYPE, "source": "mock",
-                                           "connect": False})
+        cap = FrameSourceFactory.create(
+            **{"capture_type": MOCK_TYPE, "source": "mock", "connect": False}
+        )
     assert isinstance(cap, MockCapture)
     assert cap.source == "mock"
 

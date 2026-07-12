@@ -1,11 +1,10 @@
 """Tests for the FrameSource capture contract using the hardware-free MockCapture."""
 
 import numpy as np
+from conftest import MockCapture
 
 from framesource import Frame, FrameSourceProtocol
 from framesource.sources.video_capture_base import VideoCaptureBase
-
-from conftest import MockCapture
 
 
 def test_connect_sets_open_state():

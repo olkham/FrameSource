@@ -11,14 +11,14 @@ These utilities demonstrate best practices for:
 - Race condition avoidance
 """
 
-import time
 import asyncio
-import threading
-import queue
-import multiprocessing
 import logging
+import queue
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Callable, Any, Tuple, List, Dict
+from typing import Callable, Optional
+
 import numpy as np
 
 from .sources.video_capture_base import FrameSourceProtocol
@@ -29,16 +29,20 @@ logger = logging.getLogger(__name__)
 _HIGH_DROP_RATE_THRESHOLD = 0.1
 
 
-def simple_frame_producer(capture_source: FrameSourceProtocol, frame_queue: queue.Queue,
-                         stop_event: threading.Event,
-                         target_fps: Optional[float] = None, stats: Optional[dict] = None):
+def simple_frame_producer(
+    capture_source: FrameSourceProtocol,
+    frame_queue: queue.Queue,
+    stop_event: threading.Event,
+    target_fps: Optional[float] = None,
+    stats: Optional[dict] = None,
+):
     """
     Simple producer function that runs in a thread.
-    
+
     This demonstrates the recommended approach for external threading with FrameSource.
     The producer connects to a capture source, reads frames synchronously, and puts
     them in a thread-safe queue for consumers.
-    
+
     Args:
         capture_source: Any FrameSource capture object (WebcamCapture, RealsenseCapture, etc.)
         frame_queue: Thread-safe queue to put frames into
@@ -46,25 +50,25 @@ def simple_frame_producer(capture_source: FrameSourceProtocol, frame_queue: queu
         target_fps: Optional target frame rate (None for unlimited)
         stats: Optional dict updated in-place with running statistics
             (frames_captured, frames_dropped, _latency_sum, _latency_count)
-    
+
     Example:
         ```python
         from framesource import WebcamCapture
         from framesource.threading_utils import simple_frame_producer
         import queue
         import threading
-        
+
         camera = WebcamCapture(source=0)
         frame_queue = queue.Queue(maxsize=10)
         stop_event = threading.Event()
-        
+
         producer_thread = threading.Thread(
             target=simple_frame_producer,
             args=(camera, frame_queue, stop_event, 30),  # 30 FPS
             daemon=True
         )
         producer_thread.start()
-        
+
         # Consumer loop
         while True:
             success, frame = frame_queue.get()
@@ -75,50 +79,52 @@ def simple_frame_producer(capture_source: FrameSourceProtocol, frame_queue: queu
     frame_delay = 1.0 / target_fps if target_fps else 0.0
     frames_captured = 0
     frames_dropped = 0
-    
+
     try:
         logger.info("Producer: connecting to source...")
         if not capture_source.connect():
             logger.error("Producer: failed to connect to source")
             return
-            
+
         logger.info("Producer: connected successfully")
-        
+
         while not stop_event.is_set():
             start_time = time.time()
-            
+
             # The key insight: just a simple, synchronous read
             success, frame = capture_source.read()
-            
+
             if success and frame is not None:
                 try:
                     # Put frame in queue (non-blocking)
                     frame_queue.put((success, frame), block=False)
                     frames_captured += 1
                     if stats is not None:
-                        stats['frames_captured'] = frames_captured
+                        stats["frames_captured"] = frames_captured
                         # Latency from when the frame was stamped to now.
-                        timestamp = getattr(frame, 'timestamp', None)
+                        timestamp = getattr(frame, "timestamp", None)
                         if timestamp is not None:
-                            stats['_latency_sum'] = stats.get('_latency_sum', 0.0) + (time.time() - timestamp)
-                            stats['_latency_count'] = stats.get('_latency_count', 0) + 1
+                            stats["_latency_sum"] = stats.get("_latency_sum", 0.0) + (
+                                time.time() - timestamp
+                            )
+                            stats["_latency_count"] = stats.get("_latency_count", 0) + 1
                 except queue.Full:
                     # Drop frame if queue is full - no race condition!
                     frames_dropped += 1
                     if stats is not None:
-                        stats['frames_dropped'] = frames_dropped
-            
+                        stats["frames_dropped"] = frames_dropped
+
             # Control frame rate if specified
             if frame_delay > 0:
                 elapsed = time.time() - start_time
                 sleep_time = max(0, frame_delay - elapsed)
                 if sleep_time > 0:
                     time.sleep(sleep_time)
-                
+
     except Exception as e:
         logger.exception("Producer error: %s", e)
         if stats is not None:
-            stats['errors'] = stats.get('errors', 0) + 1
+            stats["errors"] = stats.get("errors", 0) + 1
     finally:
         capture_source.disconnect()
         total = frames_captured + frames_dropped
@@ -126,7 +132,9 @@ def simple_frame_producer(capture_source: FrameSourceProtocol, frame_queue: queu
             logger.warning(
                 "Producer: high drop rate %.1f%% (%d/%d) - consumer cannot keep up; "
                 "increase queue size or processing speed.",
-                100.0 * frames_dropped / total, frames_dropped, total,
+                100.0 * frames_dropped / total,
+                frames_dropped,
+                total,
             )
         logger.info("Producer: captured %d frames, dropped %d", frames_captured, frames_dropped)
 
@@ -134,35 +142,39 @@ def simple_frame_producer(capture_source: FrameSourceProtocol, frame_queue: queu
 class FrameProducer:
     """
     A more sophisticated frame producer class with statistics and control.
-    
+
     This class wraps a capture source and provides thread-safe frame production
     with built-in statistics, error handling, and flexible configuration.
-    
+
     Example:
         ```python
         from framesource import WebcamCapture
         from framesource.threading_utils import FrameProducer
-        
+
         camera = WebcamCapture(source=0)
         producer = FrameProducer(camera, max_queue_size=10, target_fps=30)
-        
+
         producer.start()
-        
+
         # Get frames
         while True:
             success, frame = producer.get_frame(timeout=0.1)
             if success:
                 process_frame(frame)
-        
+
         producer.stop()
         ```
     """
-    
-    def __init__(self, capture_source: FrameSourceProtocol, max_queue_size: int = 10,
-                 target_fps: Optional[float] = None):
+
+    def __init__(
+        self,
+        capture_source: FrameSourceProtocol,
+        max_queue_size: int = 10,
+        target_fps: Optional[float] = None,
+    ):
         """
         Initialize the frame producer.
-        
+
         Args:
             capture_source: FrameSource capture object
             max_queue_size: Maximum size of the frame queue
@@ -171,75 +183,74 @@ class FrameProducer:
         self.capture_source = capture_source
         self.max_queue_size = max_queue_size
         self.target_fps = target_fps
-        
+
         self._frame_queue = None
         self._stop_event = None
         self._producer_thread = None
-        
+
         self._stats = {
-            'frames_captured': 0,
-            'frames_dropped': 0,
-            'errors': 0,
-            'start_time': None,
-            '_latency_sum': 0.0,
-            '_latency_count': 0,
+            "frames_captured": 0,
+            "frames_dropped": 0,
+            "errors": 0,
+            "start_time": None,
+            "_latency_sum": 0.0,
+            "_latency_count": 0,
         }
-    
+
     def start(self):
         """Start the frame producer thread."""
         if self._producer_thread and self._producer_thread.is_alive():
             logger.warning("Producer already running")
             return
-            
+
         self._frame_queue = queue.Queue(maxsize=self.max_queue_size)
         self._stop_event = threading.Event()
-        self._stats['start_time'] = time.time()
-        
-        self._producer_thread = threading.Thread(
-            target=self._producer_loop,
-            daemon=True
-        )
+        self._stats["start_time"] = time.time()
+
+        self._producer_thread = threading.Thread(target=self._producer_loop, daemon=True)
         self._producer_thread.start()
-        logger.info("Started frame producer (queue_size=%s, fps=%s)", self.max_queue_size, self.target_fps)
-    
+        logger.info(
+            "Started frame producer (queue_size=%s, fps=%s)", self.max_queue_size, self.target_fps
+        )
+
     def _producer_loop(self):
         """Internal producer loop."""
         if self._frame_queue is not None and self._stop_event is not None:
             simple_frame_producer(
-                self.capture_source, 
-                self._frame_queue, 
-                self._stop_event, 
+                self.capture_source,
+                self._frame_queue,
+                self._stop_event,
                 self.target_fps,
                 self._stats,
             )
-    
-    def get_frame(self, timeout: float = 0.1) -> Tuple[bool, Optional[np.ndarray]]:
+
+    def get_frame(self, timeout: float = 0.1) -> tuple[bool, Optional[np.ndarray]]:
         """
         Get the next frame from the producer queue.
-        
+
         Args:
             timeout: Maximum time to wait for a frame
-            
+
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
         if not self._frame_queue:
             return False, None
-            
+
         try:
             return self._frame_queue.get(timeout=timeout)
         except queue.Empty:
             return False, None
-    
+
     def stop(self):
         """Stop the producer thread."""
         if self._stop_event:
             self._stop_event.set()
         if self._producer_thread:
             self._producer_thread.join(timeout=2)
-        
+
         self._print_stats()
-    
+
     def get_stats(self) -> dict:
         """Get producer statistics.
 
@@ -249,15 +260,15 @@ class FrameProducer:
         ``_``) are omitted.
         """
         stats = self._stats.copy()
-        latency_sum = stats.pop('_latency_sum', 0.0)
-        latency_count = stats.pop('_latency_count', 0)
-        stats['avg_latency'] = (latency_sum / latency_count) if latency_count else None
-        if stats['start_time']:
-            stats['runtime'] = time.time() - stats['start_time']
-            if stats['runtime'] > 0:
-                stats['fps'] = stats['frames_captured'] / stats['runtime']
+        latency_sum = stats.pop("_latency_sum", 0.0)
+        latency_count = stats.pop("_latency_count", 0)
+        stats["avg_latency"] = (latency_sum / latency_count) if latency_count else None
+        if stats["start_time"]:
+            stats["runtime"] = time.time() - stats["start_time"]
+            if stats["runtime"] > 0:
+                stats["fps"] = stats["frames_captured"] / stats["runtime"]
         return stats
-    
+
     def _print_stats(self):
         """Log producer statistics."""
         stats = self.get_stats()
@@ -267,30 +278,30 @@ class FrameProducer:
 def multiprocess_frame_producer(source_config: dict, frame_queue, stop_event):
     """
     Producer function for multiprocessing (bypasses GIL).
-    
+
     This function runs in a separate process and communicates via
     multiprocessing queues and events.
-    
+
     Args:
         source_config: Dictionary with capture source configuration
         frame_queue: multiprocessing.Queue for frames
         stop_event: multiprocessing.Event to signal stop
-    
+
     Example:
         ```python
         import multiprocessing
         from framesource.threading_utils import multiprocess_frame_producer
-        
+
         source_config = {'source_id': 0, 'width': 640, 'height': 480}
         frame_queue = multiprocessing.Queue(maxsize=10)
         stop_event = multiprocessing.Event()
-        
+
         producer_process = multiprocessing.Process(
             target=multiprocess_frame_producer,
             args=(source_config, frame_queue, stop_event)
         )
         producer_process.start()
-        
+
         # Consumer in main process
         while True:
             success, frame = frame_queue.get()
@@ -372,8 +383,13 @@ class ProducerConsumer:
         ```
     """
 
-    def __init__(self, capture_source: FrameSourceProtocol, consumer_function: Callable,
-                 max_queue_size: int = 10, target_fps: Optional[float] = None):
+    def __init__(
+        self,
+        capture_source: FrameSourceProtocol,
+        consumer_function: Callable,
+        max_queue_size: int = 10,
+        target_fps: Optional[float] = None,
+    ):
         """Initialize the producer/consumer pair (does not start any thread).
 
         Args:
@@ -426,8 +442,9 @@ class ProducerConsumer:
 
         self.producer_thread.start()
         self.consumer_thread.start()
-        logger.info("Started ProducerConsumer (queue_size=%s, fps=%s)",
-                    self.max_queue_size, self.target_fps)
+        logger.info(
+            "Started ProducerConsumer (queue_size=%s, fps=%s)", self.max_queue_size, self.target_fps
+        )
 
     def stop(self, join: bool = True, timeout: Optional[float] = None) -> None:
         """Signal both threads to stop.
@@ -453,8 +470,12 @@ class ProducerConsumer:
         self.stop(join=True)
 
 
-def create_producer_consumer_pair(capture_source: FrameSourceProtocol, consumer_function: Callable,
-                                 max_queue_size: int = 10, target_fps: Optional[float] = None):
+def create_producer_consumer_pair(
+    capture_source: FrameSourceProtocol,
+    consumer_function: Callable,
+    max_queue_size: int = 10,
+    target_fps: Optional[float] = None,
+):
     """
     Convenience function to create a producer-consumer pair.
 
@@ -491,8 +512,9 @@ def create_producer_consumer_pair(capture_source: FrameSourceProtocol, consumer_
         producer_thread.join()
         ```
     """
-    pair = ProducerConsumer(capture_source, consumer_function,
-                            max_queue_size=max_queue_size, target_fps=target_fps)
+    pair = ProducerConsumer(
+        capture_source, consumer_function, max_queue_size=max_queue_size, target_fps=target_fps
+    )
     pair.start()
     return pair.producer_thread, pair.stop_event
 
@@ -547,7 +569,7 @@ class AsyncFrameSource:
         """Lazily create the single-worker executor on first use."""
         if self._executor is None:
             self._executor = ThreadPoolExecutor(
-                max_workers=1, thread_name_prefix='framesource-async'
+                max_workers=1, thread_name_prefix="framesource-async"
             )
         return self._executor
 
@@ -558,9 +580,7 @@ class AsyncFrameSource:
             bool: True if the connection succeeded.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self._ensure_executor(), self.capture_source.connect
-        )
+        return await loop.run_in_executor(self._ensure_executor(), self.capture_source.connect)
 
     async def read(self):
         """Read one frame without blocking the event loop.
@@ -570,9 +590,7 @@ class AsyncFrameSource:
             tuple returned by the underlying source.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self._ensure_executor(), self.capture_source.read
-        )
+        return await loop.run_in_executor(self._ensure_executor(), self.capture_source.read)
 
     async def disconnect(self) -> bool:
         """Disconnect from the underlying source without blocking the loop.
@@ -581,9 +599,7 @@ class AsyncFrameSource:
             bool: True if the disconnection succeeded.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self._ensure_executor(), self.capture_source.disconnect
-        )
+        return await loop.run_in_executor(self._ensure_executor(), self.capture_source.disconnect)
 
     def close(self) -> None:
         """Shut down the worker thread, if one was created.
@@ -647,8 +663,7 @@ class SharedProducer:
         ```
     """
 
-    def __init__(self, capture_source: FrameSourceProtocol,
-                 target_fps: Optional[float] = None):
+    def __init__(self, capture_source: FrameSourceProtocol, target_fps: Optional[float] = None):
         """Initialize the shared producer.
 
         Args:
@@ -658,8 +673,8 @@ class SharedProducer:
         self.capture_source = capture_source
         self.target_fps = target_fps
 
-        self._subscribers: List[queue.Queue] = []
-        self._drops: Dict[int, int] = {}
+        self._subscribers: list[queue.Queue] = []
+        self._drops: dict[int, int] = {}
         self._lock = threading.Lock()
 
         self._stop_event = threading.Event()
@@ -767,9 +782,9 @@ class SharedProducer:
         runtime = (time.time() - self._start_time) if self._start_time else 0.0
         fps = (self._frames_captured / runtime) if runtime > 0 else 0.0
         return {
-            'frames_captured': self._frames_captured,
-            'frames_dropped': total_drops,
-            'drops_per_subscriber': per_subscriber,
-            'runtime': runtime,
-            'fps': fps,
+            "frames_captured": self._frames_captured,
+            "frames_dropped": total_drops,
+            "drops_per_subscriber": per_subscriber,
+            "runtime": runtime,
+            "fps": fps,
         }

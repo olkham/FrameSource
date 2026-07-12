@@ -12,11 +12,11 @@ import types
 
 import pytest
 
-from framesource.sources.webcam_capture import WebcamCapture
-from framesource.sources.video_file_capture import VideoFileCapture
 from framesource.sources.folder_capture import FolderCapture
 from framesource.sources.ipcamera_capture import IPCameraCapture
 from framesource.sources.screen_capture import ScreenCapture
+from framesource.sources.video_file_capture import VideoFileCapture
+from framesource.sources.webcam_capture import WebcamCapture
 
 
 def _param_names(cls):
@@ -60,8 +60,7 @@ def test_webcam_signature_exposes_promoted_params():
 # VideoFileCapture
 # --------------------------------------------------------------------------- #
 def test_videofile_named_params_set_attrs_and_config():
-    cap = VideoFileCapture("clip.mp4", loop=True, real_time=False,
-                           width=640, height=480, fps=25)
+    cap = VideoFileCapture("clip.mp4", loop=True, real_time=False, width=640, height=480, fps=25)
     assert cap.loop is True
     assert cap.real_time is False
     assert cap.config["width"] == 640
@@ -96,8 +95,9 @@ def test_videofile_signature_exposes_promoted_params():
 # FolderCapture (already had positional params; verify preserved + typed)
 # --------------------------------------------------------------------------- #
 def test_folder_named_params_set_attrs():
-    cap = FolderCapture("some/folder", sort_by="date", fps=10,
-                        loop=True, real_time=False, watch_folder=False)
+    cap = FolderCapture(
+        "some/folder", sort_by="date", fps=10, loop=True, real_time=False, watch_folder=False
+    )
     assert cap.sort_by == "date"
     assert cap.fps == 10
     assert cap.loop is True
@@ -116,16 +116,24 @@ def test_folder_unknown_kwarg_lands_in_config():
 
 
 def test_folder_signature_exposes_params():
-    assert {"sort_by", "width", "height", "fps", "real_time", "loop",
-            "watch_folder"} <= _param_names(FolderCapture)
+    assert {
+        "sort_by",
+        "width",
+        "height",
+        "fps",
+        "real_time",
+        "loop",
+        "watch_folder",
+    } <= _param_names(FolderCapture)
 
 
 # --------------------------------------------------------------------------- #
 # IPCameraCapture
 # --------------------------------------------------------------------------- #
 def test_ipcamera_named_params_set_attrs_and_config():
-    cap = IPCameraCapture("rtsp://host/stream", username="u", password="p",
-                          width=800, height=600, fps=25)
+    cap = IPCameraCapture(
+        "rtsp://host/stream", username="u", password="p", width=800, height=600, fps=25
+    )
     assert cap.username == "u"
     assert cap.password == "p"
     assert cap.config["width"] == 800
@@ -195,13 +203,15 @@ def _audio_cls():
     pytest.importorskip("soundfile")
     pytest.importorskip("pyaudio")
     from framesource.sources.audiospectrogram_capture import AudioSpectrogramCapture
+
     return AudioSpectrogramCapture
 
 
 def test_audio_named_params_set_attrs():
     AudioSpectrogramCapture = _audio_cls()
-    cap = AudioSpectrogramCapture(source=0, n_mels=64, n_fft=1024, frame_rate=15,
-                                  contrast_method="percentile")
+    cap = AudioSpectrogramCapture(
+        source=0, n_mels=64, n_fft=1024, frame_rate=15, contrast_method="percentile"
+    )
     assert cap.n_mels == 64
     assert cap.n_fft == 1024
     assert cap.frame_rate == 15
@@ -224,8 +234,16 @@ def test_audio_unknown_kwarg_lands_in_config():
 
 def test_audio_signature_exposes_promoted_params():
     AudioSpectrogramCapture = _audio_cls()
-    assert {"n_mels", "n_fft", "hop_length", "window_duration", "freq_range",
-            "sample_rate", "colormap", "frame_rate"} <= _param_names(AudioSpectrogramCapture)
+    assert {
+        "n_mels",
+        "n_fft",
+        "hop_length",
+        "window_duration",
+        "freq_range",
+        "sample_rate",
+        "colormap",
+        "frame_rate",
+    } <= _param_names(AudioSpectrogramCapture)
 
 
 # --------------------------------------------------------------------------- #
@@ -239,17 +257,14 @@ def test_audio_signature_exposes_promoted_params():
 # --------------------------------------------------------------------------- #
 from framesource.sources.basler_capture import BaslerCapture
 from framesource.sources.genicam_capture import GenicamCapture
+from framesource.sources.huateng_capture import HuatengCapture
 from framesource.sources.realsense_capture import RealsenseCapture
 from framesource.sources.ximea_capture import XimeaCapture
-from framesource.sources.huateng_capture import HuatengCapture
 
 
 def _kwonly_names(cls):
     params = inspect.signature(cls.__init__).parameters
-    return {
-        name for name, p in params.items()
-        if p.kind is inspect.Parameter.KEYWORD_ONLY
-    }
+    return {name for name, p in params.items() if p.kind is inspect.Parameter.KEYWORD_ONLY}
 
 
 def test_basler_signature_exposes_promoted_params():
@@ -262,8 +277,18 @@ def test_basler_signature_exposes_promoted_params():
 
 
 def test_genicam_signature_exposes_promoted_params():
-    expected = {"is_mono", "cti_files", "exposure", "gain", "width", "height",
-                "x", "y", "fps", "acquisition_framerate"}
+    expected = {
+        "is_mono",
+        "cti_files",
+        "exposure",
+        "gain",
+        "width",
+        "height",
+        "x",
+        "y",
+        "fps",
+        "acquisition_framerate",
+    }
     assert expected <= _param_names(GenicamCapture)
     assert expected <= _kwonly_names(GenicamCapture)
     sig = inspect.signature(GenicamCapture.__init__)
@@ -312,7 +337,9 @@ def test_basler_named_params_populate_config(monkeypatch):
     # `from pypylon import pylon` import succeeds and we can verify the
     # promoted kwargs actually reach self.config/self.is_mono, unrelated to
     # whether pypylon is genuinely installed.
-    monkeypatch.setitem(sys.modules, "pypylon", _fake_module("pypylon", pylon=types.SimpleNamespace()))
+    monkeypatch.setitem(
+        sys.modules, "pypylon", _fake_module("pypylon", pylon=types.SimpleNamespace())
+    )
 
     cap = BaslerCapture(is_mono=True, exposure=100, gain=1.0, width=640, height=480)
     assert cap.config["is_mono"] is True
@@ -324,7 +351,9 @@ def test_basler_named_params_populate_config(monkeypatch):
 
 
 def test_basler_absent_optional_params_not_in_config(monkeypatch):
-    monkeypatch.setitem(sys.modules, "pypylon", _fake_module("pypylon", pylon=types.SimpleNamespace()))
+    monkeypatch.setitem(
+        sys.modules, "pypylon", _fake_module("pypylon", pylon=types.SimpleNamespace())
+    )
 
     cap = BaslerCapture()
     assert "is_mono" not in cap.config
@@ -365,9 +394,18 @@ def test_genicam_named_params_populate_config(monkeypatch):
     monkeypatch.setitem(sys.modules, "harvesters", fake_harvesters)
     monkeypatch.setitem(sys.modules, "harvesters.core", fake_core)
 
-    cap = GenicamCapture(is_mono=True, cti_files=["a.cti"], exposure=10, gain=1,
-                          width=100, height=200, x=1, y=2, fps=15,
-                          acquisition_framerate=20)
+    cap = GenicamCapture(
+        is_mono=True,
+        cti_files=["a.cti"],
+        exposure=10,
+        gain=1,
+        width=100,
+        height=200,
+        x=1,
+        y=2,
+        fps=15,
+        acquisition_framerate=20,
+    )
     assert cap.config["is_mono"] is True
     assert cap.config["cti_files"] == ["a.cti"]
     assert cap.config["exposure"] == 10
@@ -443,9 +481,16 @@ def test_huateng_absent_optional_params_not_in_config():
 # --------------------------------------------------------------------------- #
 # get_config_schema() deprecation (Step 7.11)
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("cls", [
-    WebcamCapture, VideoFileCapture, FolderCapture, IPCameraCapture, ScreenCapture,
-])
+@pytest.mark.parametrize(
+    "cls",
+    [
+        WebcamCapture,
+        VideoFileCapture,
+        FolderCapture,
+        IPCameraCapture,
+        ScreenCapture,
+    ],
+)
 def test_get_config_schema_deprecated(cls):
     with pytest.warns(DeprecationWarning):
         schema = cls.get_config_schema()

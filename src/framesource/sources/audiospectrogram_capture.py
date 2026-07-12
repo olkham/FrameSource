@@ -1,73 +1,86 @@
-import numpy as np
-import cv2
-import threading
-import time
 import logging
+import threading
 import warnings
-from typing import Optional, Tuple, Any, Union, Dict, List
 from pathlib import Path
+from typing import Any, Optional, Union
+
+import cv2
+import numpy as np
 
 try:
     import librosa
-    import soundfile as sf
     import pyaudio
+    import soundfile as sf  # noqa: F401 - availability probe for the optional "audio" extra
+
     AUDIO_AVAILABLE = True
 except ImportError as e:
     AUDIO_AVAILABLE = False
     MISSING_DEPS = str(e)
 
-from .video_capture_base import VideoCaptureBase
 from ..discovery import DeviceInfo
 from ..errors import MissingDependencyError
+from .video_capture_base import VideoCaptureBase
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_freq_range(value: Union[str, Tuple[float, float], list]) -> Tuple[float, float]:
+def _parse_freq_range(value: Union[str, tuple[float, float], list]) -> tuple[float, float]:
     """Parse a frequency range given as ``(min, max)``, ``[min, max]`` or ``"min,max"``.
 
     Raises:
         ValueError: If the value does not contain exactly two numeric entries.
     """
     if isinstance(value, str):
-        parts = value.split(',')
+        parts = value.split(",")
     elif isinstance(value, (tuple, list)):
         parts = list(value)
     else:
         raise ValueError(
-            f"freq_range must be a (min_freq, max_freq) tuple/list or a 'min,max' string, got {value!r}")
+            "freq_range must be a (min_freq, max_freq) tuple/list or a "
+            f"'min,max' string, got {value!r}"
+        )
     if len(parts) != 2:
         raise ValueError("freq_range must contain exactly 2 values: min_freq,max_freq")
     try:
         return (float(parts[0]), float(parts[1]))
-    except (TypeError, ValueError):
-        raise ValueError(f"freq_range values must be numeric, got {value!r}")
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"freq_range values must be numeric, got {value!r}") from e
 
 
 class AudioSpectrogramCapture(VideoCaptureBase):
     """
     Audio spectrogram capture implementation.
     """
+
     has_discovery = True
     supports_exposure = False  # No optical exposure; stubs return a no-op
-    supports_gain = False      # No optical gain; stubs return a no-op
+    supports_gain = False  # No optical gain; stubs return a no-op
     """
     Capture audio spectrograms as video frames from microphones or audio files.
     Treats spectrograms as visual data that can be processed like regular video frames.
     """
 
-    def __init__(self, source: Union[int, str, None] = None, *,
-                 n_mels: int = 128, n_fft: int = 2048, hop_length: int = 512,
-                 window_duration: float = 2.0,
-                 freq_range: Union[str, Tuple[float, float], list] = (20, 8000),
-                 sample_rate: int = 44100,
-                 colormap: Optional[Union[int, str]] = None,
-                 db_range: Tuple[float, float] = (-80, 0),
-                 frame_rate: int = 30, audio_buffer_size: int = 1024,
-                 contrast_method: str = 'fixed', adaptive_alpha: float = 0.95,
-                 percentile_range: Union[Tuple[float, float], list] = (5, 95),
-                 gamma_correction: float = 1.0, noise_floor: float = -70,
-                 **kwargs):
+    def __init__(
+        self,
+        source: Union[int, str, None] = None,
+        *,
+        n_mels: int = 128,
+        n_fft: int = 2048,
+        hop_length: int = 512,
+        window_duration: float = 2.0,
+        freq_range: Union[str, tuple[float, float], list] = (20, 8000),
+        sample_rate: int = 44100,
+        colormap: Optional[Union[int, str]] = None,
+        db_range: tuple[float, float] = (-80, 0),
+        frame_rate: int = 30,
+        audio_buffer_size: int = 1024,
+        contrast_method: str = "fixed",
+        adaptive_alpha: float = 0.95,
+        percentile_range: Union[tuple[float, float], list] = (5, 95),
+        gamma_correction: float = 1.0,
+        noise_floor: float = -70,
+        **kwargs,
+    ):
         """
         Initialize audio spectrogram capture.
 
@@ -96,19 +109,28 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             **kwargs: Additional passthrough options stored on ``self.config``.
         """
         if not AUDIO_AVAILABLE:
-            raise MissingDependencyError('librosa/soundfile/pyaudio', extra='audio', details=MISSING_DEPS)
+            raise MissingDependencyError(
+                "librosa/soundfile/pyaudio", extra="audio", details=MISSING_DEPS
+            )
 
         # Forward the promoted spectrogram options back into ``self.config`` so
         # its contents match the historical ``**kwargs`` passthrough.
         for _key, _val in (
-            ('n_mels', n_mels), ('n_fft', n_fft), ('hop_length', hop_length),
-            ('window_duration', window_duration), ('freq_range', freq_range),
-            ('sample_rate', sample_rate), ('colormap', colormap),
-            ('db_range', db_range), ('frame_rate', frame_rate),
-            ('audio_buffer_size', audio_buffer_size),
-            ('contrast_method', contrast_method), ('adaptive_alpha', adaptive_alpha),
-            ('percentile_range', percentile_range),
-            ('gamma_correction', gamma_correction), ('noise_floor', noise_floor),
+            ("n_mels", n_mels),
+            ("n_fft", n_fft),
+            ("hop_length", hop_length),
+            ("window_duration", window_duration),
+            ("freq_range", freq_range),
+            ("sample_rate", sample_rate),
+            ("colormap", colormap),
+            ("db_range", db_range),
+            ("frame_rate", frame_rate),
+            ("audio_buffer_size", audio_buffer_size),
+            ("contrast_method", contrast_method),
+            ("adaptive_alpha", adaptive_alpha),
+            ("percentile_range", percentile_range),
+            ("gamma_correction", gamma_correction),
+            ("noise_floor", noise_floor),
         ):
             if _val is not None:
                 kwargs[_key] = _val
@@ -142,7 +164,7 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         # Adaptive normalization state
         self._adaptive_min = None
         self._adaptive_max = None
-        
+
         # Validate and adjust sample rate based on frequency range
         max_freq = self.freq_range[1]
         nyquist_freq = self.sample_rate / 2
@@ -152,15 +174,19 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             # Round to common sample rates
             common_rates = [22050, 44100, 48000, 88200, 96000, 192000]
             self.sample_rate = min(rate for rate in common_rates if rate >= required_sample_rate)
-            logger.warning(f"Frequency range {self.freq_range} requires sample rate >= {required_sample_rate}Hz. "
-                          f"Adjusted sample rate to {self.sample_rate}Hz")
-        
-        logger.info(f"Sample rate: {self.sample_rate}Hz, Nyquist frequency: {self.sample_rate/2}Hz")
-        
+            logger.warning(
+                f"Frequency range {self.freq_range} requires sample rate >= "
+                f"{required_sample_rate}Hz. Adjusted sample rate to {self.sample_rate}Hz"
+            )
+
+        logger.info(
+            f"Sample rate: {self.sample_rate}Hz, Nyquist frequency: {self.sample_rate / 2}Hz"
+        )
+
         # Calculated parameters
         self.window_samples = int(self.window_duration * self.sample_rate)
         self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
-        
+
         # Audio processing
         self.audio_buffer = np.zeros(self.window_samples, dtype=np.float32)
         self.mel_filter: Optional[np.ndarray] = None
@@ -171,16 +197,18 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         self.is_file_source = False
         self.audio_data: Optional[np.ndarray] = None
         self.audio_position = 0
-        
+
         # Frame buffer for consistent frame rate
         self.current_frame = None
         self.frame_lock = threading.Lock()
-        
+
         logger.info(f"AudioSpectrogramCapture initialized - Source: {source}")
-        logger.info(f"Spectrogram params: n_mels={self.n_mels}, n_fft={self.n_fft}, "
-                   f"window_duration={self.window_duration}s, freq_range={self.freq_range}")
-    
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+        logger.info(
+            f"Spectrogram params: n_mels={self.n_mels}, n_fft={self.n_fft}, "
+            f"window_duration={self.window_duration}s, freq_range={self.freq_range}"
+        )
+
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
         Read a single spectrogram frame.
         Returns:
@@ -188,31 +216,31 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         """
         if not self.is_connected:
             return False, None
-        
+
         try:
             if self.is_file_source:
                 return self._read_file_frame()
             else:
                 return self._read_microphone_frame()
-                
+
         except Exception as e:
             logger.error(f"Error reading frame: {e}")
             return False, None
-    
+
     def connect(self) -> bool:
         """Connect to audio source."""
         try:
             self._setup_mel_filter()
-            
+
             if isinstance(self.source, str) and Path(self.source).exists():
                 return self._connect_file()
             else:
                 return self._connect_microphone()
-                
+
         except Exception as e:
             logger.error(f"Failed to connect to audio source: {e}")
             return False
-    
+
     def _setup_mel_filter(self):
         """Setup mel filter bank."""
         self.mel_filter = librosa.filters.mel(
@@ -220,47 +248,51 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             n_fft=self.n_fft,
             n_mels=self.n_mels,
             fmin=self.freq_range[0],
-            fmax=self.freq_range[1]
+            fmax=self.freq_range[1],
         )
         if self.mel_filter is not None:
             logger.info(f"Mel filter bank created: {self.mel_filter.shape}")
         else:
             logger.error("Failed to create mel filter bank")
-    
+
     def _connect_file(self) -> bool:
         """Connect to audio file."""
         try:
             self.audio_data, sr = librosa.load(self.source, sr=self.sample_rate)
             if sr != self.sample_rate:
                 logger.warning(f"File sample rate {sr} resampled to {self.sample_rate}")
-            
+
             self.is_file_source = True
             self.audio_position = 0
             self.is_connected = True
-            
-            logger.info(f"Connected to audio file: {self.source} "
-                       f"(duration: {len(self.audio_data)/self.sample_rate:.2f}s)" if self.audio_data is not None else "")
+
+            logger.info(
+                f"Connected to audio file: {self.source} "
+                f"(duration: {len(self.audio_data) / self.sample_rate:.2f}s)"
+                if self.audio_data is not None
+                else ""
+            )
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to load audio file: {e}")
             return False
-    
+
     def _connect_microphone(self) -> bool:
         """Connect to microphone."""
         try:
             self.pyaudio_instance = pyaudio.PyAudio()
-            
+
             # Determine device index
             device_index = None
             if isinstance(self.source, int):
                 device_index = self.source
-            
+
             # Get device info
             if device_index is not None:
                 device_info = self.pyaudio_instance.get_device_info_by_index(device_index)
                 logger.info(f"Using audio device: {device_info['name']}")
-            
+
             # Open audio stream
             self.audio_stream = self.pyaudio_instance.open(
                 format=pyaudio.paFloat32,
@@ -269,122 +301,124 @@ class AudioSpectrogramCapture(VideoCaptureBase):
                 input=True,
                 input_device_index=device_index,
                 frames_per_buffer=self.audio_buffer_size,
-                stream_callback=self._audio_callback
+                stream_callback=self._audio_callback,
             )
-            
+
             self.is_file_source = False
             self.is_connected = True
-            
+
             logger.info(f"Connected to microphone (device {device_index})")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to microphone: {e}")
             return False
-    
+
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """PyAudio callback for real-time audio capture."""
         if status:
             logger.warning(f"Audio callback status: {status}")
-        
+
         audio_chunk = np.frombuffer(in_data, dtype=np.float32)
-        
+
         # Shift buffer and add new data
         shift_amount = len(audio_chunk)
         self.audio_buffer[:-shift_amount] = self.audio_buffer[shift_amount:]
         self.audio_buffer[-shift_amount:] = audio_chunk
-        
+
         return (None, pyaudio.paContinue)
-    
+
     def disconnect(self) -> bool:
         """Disconnect from audio source."""
         try:
             self.is_connected = False
-            
+
             if self.audio_stream:
                 self.audio_stream.stop_stream()
                 self.audio_stream.close()
                 self.audio_stream = None
-            
+
             if self.pyaudio_instance:
                 self.pyaudio_instance.terminate()
                 self.pyaudio_instance = None
-            
+
             logger.info("Disconnected from audio source")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error disconnecting: {e}")
             return False
-    
-    def _read_file_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
+
+    def _read_file_frame(self) -> tuple[bool, Optional[np.ndarray]]:
         """Read frame from audio file."""
         if self.audio_data is None:
             return False, None
-            
+
         if self.audio_position + self.window_samples > len(self.audio_data):
             # Loop back to beginning
             self.audio_position = 0
-        
+
         # Extract audio window
-        audio_window = self.audio_data[self.audio_position:self.audio_position + self.window_samples]
-        
+        audio_window = self.audio_data[
+            self.audio_position : self.audio_position + self.window_samples
+        ]
+
         # Advance position
         advance_samples = int(self.sample_rate / self.frame_rate)
         self.audio_position += advance_samples
-        
+
         # Generate spectrogram
         spectrogram = self._generate_spectrogram(audio_window)
         return True, spectrogram
-    
-    def _read_microphone_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
+
+    def _read_microphone_frame(self) -> tuple[bool, Optional[np.ndarray]]:
         """Read frame from microphone."""
         if not self.audio_stream or not self.audio_stream.is_active():
             return False, None
-        
+
         # Use current audio buffer
         audio_window = self.audio_buffer.copy()
-        
+
         # Generate spectrogram
         spectrogram = self._generate_spectrogram(audio_window)
         return True, spectrogram
-    
+
     def _generate_spectrogram(self, audio_data: np.ndarray) -> np.ndarray:
         """Generate mel spectrogram from audio data."""
         if self.mel_filter is None:
             raise RuntimeError("Mel filter not initialized")
-            
+
         # Compute STFT
         stft = librosa.stft(audio_data, n_fft=self.n_fft, hop_length=self.hop_length)
         magnitude = np.abs(stft)
-        
+
         # Apply mel filter
         mel_spectrogram = np.dot(self.mel_filter, magnitude)
-        
+
         # Convert to dB
         mel_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
-        
+
         # Apply noise floor
         mel_db = np.maximum(mel_db, self.noise_floor)
-        
+
         # Apply contrast enhancement based on method
-        if self.contrast_method == 'adaptive':
+        if self.contrast_method == "adaptive":
             mel_normalized = self._adaptive_normalize(mel_db)
-        elif self.contrast_method == 'percentile':
+        elif self.contrast_method == "percentile":
             mel_normalized = self._percentile_normalize(mel_db)
         else:  # 'fixed'
             mel_normalized = self._fixed_normalize(mel_db)
-        
+
         # Apply gamma correction for additional contrast control
         if self.gamma_correction != 1.0:
             mel_normalized = np.power(mel_normalized, self.gamma_correction)
-        
+
         # Convert to uint8
         mel_uint8 = (np.clip(mel_normalized, 0, 1) * 255).astype(np.uint8)
-        
+
         # Flip vertically (high frequencies at top)
         mel_uint8 = np.flipud(mel_uint8)
-        
+
         # Apply colormap if specified, otherwise return grayscale
         if self.colormap is not None and isinstance(self.colormap, int):
             try:
@@ -392,11 +426,11 @@ class AudioSpectrogramCapture(VideoCaptureBase):
                 if not isinstance(mel_uint8, np.ndarray):
                     logger.warning("mel_uint8 is not a numpy array, converting...")
                     mel_uint8 = np.array(mel_uint8, dtype=np.uint8)
-                    
+
                 # Ensure it's uint8
                 if mel_uint8.dtype != np.uint8:
                     mel_uint8 = mel_uint8.astype(np.uint8)
-                
+
                 colored = cv2.applyColorMap(mel_uint8, self.colormap)
             except Exception as e:
                 logger.warning(f"Failed to apply colormap {self.colormap}: {e}. Using grayscale.")
@@ -405,35 +439,37 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         else:
             # Convert grayscale to 3-channel for consistency with colored spectrograms
             colored = cv2.cvtColor(mel_uint8, cv2.COLOR_GRAY2BGR)
-        
+
         return colored
-    
-    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+
+    def get_frame_size(self) -> Optional[tuple[int, int]]:
         """Get spectrogram frame dimensions (width, height)."""
         return (self.spectrogram_width, self.n_mels)
-    
+
     def set_frame_size(self, width: int, height: int) -> bool:
         """Set spectrogram dimensions by adjusting parameters."""
-        logger.warning("Frame size for spectrograms is determined by audio parameters. "
-                      "Adjust n_mels, window_duration, or hop_length instead.")
+        logger.warning(
+            "Frame size for spectrograms is determined by audio parameters. "
+            "Adjust n_mels, window_duration, or hop_length instead."
+        )
         return False
-    
+
     def get_fps(self) -> Optional[float]:
         """Get spectrogram frame rate."""
         return self.frame_rate
-    
+
     def set_fps(self, fps: float) -> bool:
         """Set spectrogram frame rate."""
         if fps > 0:
             self.frame_rate = fps
             return True
         return False
-    
+
     # Audio-specific parameter methods
     def get_n_mels(self) -> int:
         """Get number of mel bands."""
         return self.n_mels
-    
+
     def set_n_mels(self, n_mels: int) -> bool:
         """Set number of mel bands (requires reconnection)."""
         if n_mels > 0:
@@ -441,11 +477,11 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             logger.info(f"n_mels set to {n_mels}. Reconnect to apply changes.")
             return True
         return False
-    
+
     def get_window_duration(self) -> float:
         """Get audio window duration."""
         return self.window_duration
-    
+
     def set_window_duration(self, duration: float) -> bool:
         """Set audio window duration (requires reconnection)."""
         if duration > 0:
@@ -455,13 +491,16 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             logger.info(f"Window duration set to {duration}s. Reconnect to apply changes.")
             return True
         return False
-    
-    def get_freq_range(self) -> Tuple[float, float]:
+
+    def get_freq_range(self) -> tuple[float, float]:
         """Get frequency range."""
         return self.freq_range
-    
+
     def set_freq_range(self, min_freq: float, max_freq: float) -> bool:
-        """Set frequency range (requires reconnection). Automatically adjusts sample rate if needed."""
+        """Set frequency range (requires reconnection).
+
+        Automatically adjusts sample rate if needed.
+        """
         if 0 < min_freq < max_freq:
             # Check if current sample rate supports the requested frequency range
             nyquist_freq = self.sample_rate / 2
@@ -471,28 +510,34 @@ class AudioSpectrogramCapture(VideoCaptureBase):
                 # Round to common sample rates
                 common_rates = [22050, 44100, 48000, 88200, 96000, 192000]
                 new_sample_rate = min(rate for rate in common_rates if rate >= required_sample_rate)
-                
-                logger.warning(f"Frequency range ({min_freq}, {max_freq}) requires sample rate >= {required_sample_rate}Hz. "
-                              f"Adjusted sample rate from {self.sample_rate}Hz to {new_sample_rate}Hz")
+
+                logger.warning(
+                    f"Frequency range ({min_freq}, {max_freq}) requires sample rate >= "
+                    f"{required_sample_rate}Hz. Adjusted sample rate from "
+                    f"{self.sample_rate}Hz to {new_sample_rate}Hz"
+                )
                 self.sample_rate = new_sample_rate
-                
+
                 # Recalculate window samples based on new sample rate
                 self.window_samples = int(self.window_duration * self.sample_rate)
                 self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
-            
+
             self.freq_range = (min_freq, max_freq)
-            logger.info(f"Frequency range set to {self.freq_range}. Sample rate: {self.sample_rate}Hz. Reconnect to apply changes.")
+            logger.info(
+                f"Frequency range set to {self.freq_range}. "
+                f"Sample rate: {self.sample_rate}Hz. Reconnect to apply changes."
+            )
             return True
         return False
-    
+
     def get_nyquist_frequency(self) -> float:
         """Get the Nyquist frequency (maximum representable frequency)."""
         return self.sample_rate / 2.0
-    
+
     def get_sample_rate(self) -> int:
         """Get the current sample rate."""
         return self.sample_rate
-    
+
     def set_sample_rate(self, sample_rate: int) -> bool:
         """Set sample rate (requires reconnection)."""
         if sample_rate > 0:
@@ -500,23 +545,26 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             # Recalculate dependent parameters
             self.window_samples = int(self.window_duration * self.sample_rate)
             self.spectrogram_width = int(self.window_samples // self.hop_length) + 1
-            logger.info(f"Sample rate set to {sample_rate}Hz. Nyquist frequency: {self.get_nyquist_frequency()}Hz. Reconnect to apply changes.")
+            logger.info(
+                f"Sample rate set to {sample_rate}Hz. "
+                f"Nyquist frequency: {self.get_nyquist_frequency()}Hz. Reconnect to apply changes."
+            )
             return True
         return False
 
     def _validate_colormap(self, colormap_param) -> Optional[int]:
         """
         Validate and convert colormap parameter to proper OpenCV colormap constant.
-        
+
         Args:
             colormap_param: Colormap parameter (int, str, or None)
-            
+
         Returns:
             Optional[int]: Valid OpenCV colormap constant or None
         """
-        if colormap_param is None or colormap_param == '':
+        if colormap_param is None or colormap_param == "":
             return None
-            
+
         # If it's already an integer, validate it's a valid OpenCV colormap
         if isinstance(colormap_param, int):
             # OpenCV colormap constants are typically 0-21
@@ -525,51 +573,51 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             else:
                 logger.warning(f"Invalid colormap integer {colormap_param}, using grayscale")
                 return None
-                
+
         # If it's a string, try to convert to OpenCV constant
         if isinstance(colormap_param, str):
             colormap_map = {
-                'AUTUMN': cv2.COLORMAP_AUTUMN,
-                'BONE': cv2.COLORMAP_BONE,
-                'JET': cv2.COLORMAP_JET,
-                'WINTER': cv2.COLORMAP_WINTER,
-                'RAINBOW': cv2.COLORMAP_RAINBOW,
-                'OCEAN': cv2.COLORMAP_OCEAN,
-                'SUMMER': cv2.COLORMAP_SUMMER,
-                'SPRING': cv2.COLORMAP_SPRING,
-                'COOL': cv2.COLORMAP_COOL,
-                'HSV': cv2.COLORMAP_HSV,
-                'PINK': cv2.COLORMAP_PINK,
-                'HOT': cv2.COLORMAP_HOT,
-                'PARULA': cv2.COLORMAP_PARULA,
-                'MAGMA': cv2.COLORMAP_MAGMA,
-                'INFERNO': cv2.COLORMAP_INFERNO,
-                'PLASMA': cv2.COLORMAP_PLASMA,
-                'VIRIDIS': cv2.COLORMAP_VIRIDIS,
-                'CIVIDIS': cv2.COLORMAP_CIVIDIS,
-                'TWILIGHT': cv2.COLORMAP_TWILIGHT,
-                'TWILIGHT_SHIFTED': cv2.COLORMAP_TWILIGHT_SHIFTED,
-                'TURBO': cv2.COLORMAP_TURBO,
-                'DEEPGREEN': cv2.COLORMAP_DEEPGREEN,
+                "AUTUMN": cv2.COLORMAP_AUTUMN,
+                "BONE": cv2.COLORMAP_BONE,
+                "JET": cv2.COLORMAP_JET,
+                "WINTER": cv2.COLORMAP_WINTER,
+                "RAINBOW": cv2.COLORMAP_RAINBOW,
+                "OCEAN": cv2.COLORMAP_OCEAN,
+                "SUMMER": cv2.COLORMAP_SUMMER,
+                "SPRING": cv2.COLORMAP_SPRING,
+                "COOL": cv2.COLORMAP_COOL,
+                "HSV": cv2.COLORMAP_HSV,
+                "PINK": cv2.COLORMAP_PINK,
+                "HOT": cv2.COLORMAP_HOT,
+                "PARULA": cv2.COLORMAP_PARULA,
+                "MAGMA": cv2.COLORMAP_MAGMA,
+                "INFERNO": cv2.COLORMAP_INFERNO,
+                "PLASMA": cv2.COLORMAP_PLASMA,
+                "VIRIDIS": cv2.COLORMAP_VIRIDIS,
+                "CIVIDIS": cv2.COLORMAP_CIVIDIS,
+                "TWILIGHT": cv2.COLORMAP_TWILIGHT,
+                "TWILIGHT_SHIFTED": cv2.COLORMAP_TWILIGHT_SHIFTED,
+                "TURBO": cv2.COLORMAP_TURBO,
+                "DEEPGREEN": cv2.COLORMAP_DEEPGREEN,
             }
-            
+
             colormap_name = colormap_param.upper()
             if colormap_name in colormap_map:
                 return colormap_map[colormap_name]
             else:
                 logger.warning(f"Unknown colormap name '{colormap_param}', using grayscale")
                 return None
-                
+
         logger.warning(f"Invalid colormap type {type(colormap_param)}, using grayscale")
         return None
 
     def set_colormap(self, colormap: Optional[int]) -> bool:
         """
         Set the colormap for spectrogram visualization.
-        
+
         Args:
             colormap: OpenCV colormap constant (e.g., cv2.COLORMAP_VIRIDIS) or None for grayscale
-            
+
         Returns:
             bool: True if successful
         """
@@ -577,7 +625,7 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         colormap_name = "grayscale" if self.colormap is None else f"cv2 colormap {self.colormap}"
         logger.info(f"Colormap set to {colormap_name}")
         return True
-    
+
     def get_colormap(self) -> Optional[int]:
         """Get the current colormap (None means grayscale)."""
         return self.colormap
@@ -585,36 +633,38 @@ class AudioSpectrogramCapture(VideoCaptureBase):
     def set_contrast_method(self, method: str) -> bool:
         """
         Set the contrast enhancement method.
-        
+
         Args:
             method: 'fixed', 'adaptive', or 'percentile'
-            
+
         Returns:
             bool: True if successful
         """
-        if method in ['fixed', 'adaptive', 'percentile']:
+        if method in ["fixed", "adaptive", "percentile"]:
             self.contrast_method = method
             # Reset adaptive state when changing methods
-            if method == 'adaptive':
+            if method == "adaptive":
                 self._adaptive_min = None
                 self._adaptive_max = None
             logger.info(f"Contrast method set to {method}")
             return True
         else:
-            logger.warning(f"Invalid contrast method: {method}. Use 'fixed', 'adaptive', or 'percentile'")
+            logger.warning(
+                f"Invalid contrast method: {method}. Use 'fixed', 'adaptive', or 'percentile'"
+            )
             return False
-    
+
     def get_contrast_method(self) -> str:
         """Get the current contrast enhancement method."""
         return self.contrast_method
-    
+
     def set_gamma_correction(self, gamma: float) -> bool:
         """
         Set gamma correction value for contrast enhancement.
-        
+
         Args:
             gamma: Gamma value (< 1.0 increases contrast, > 1.0 decreases contrast)
-            
+
         Returns:
             bool: True if successful
         """
@@ -623,37 +673,37 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             logger.info(f"Gamma correction set to {gamma}")
             return True
         return False
-    
+
     def get_gamma_correction(self) -> float:
         """Get the current gamma correction value."""
         return self.gamma_correction
-    
+
     def set_noise_floor(self, noise_floor_db: float) -> bool:
         """
         Set the noise floor in dB to suppress background noise.
-        
+
         Args:
             noise_floor_db: Noise floor in dB (e.g., -70)
-            
+
         Returns:
             bool: True if successful
         """
         self.noise_floor = noise_floor_db
         logger.info(f"Noise floor set to {noise_floor_db} dB")
         return True
-    
+
     def get_noise_floor(self) -> float:
         """Get the current noise floor in dB."""
         return self.noise_floor
-    
+
     def set_percentile_range(self, low: float, high: float) -> bool:
         """
         Set the percentile range for percentile-based normalization.
-        
+
         Args:
             low: Lower percentile (0-100)
             high: Upper percentile (0-100)
-            
+
         Returns:
             bool: True if successful
         """
@@ -662,69 +712,76 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             logger.info(f"Percentile range set to {self.percentile_range}")
             return True
         return False
-    
-    def get_percentile_range(self) -> Tuple[float, float]:
+
+    def get_percentile_range(self) -> tuple[float, float]:
         """Get the current percentile range."""
         return self.percentile_range
 
-    def validate_frequency_range(self, min_freq: float, max_freq: float) -> Tuple[bool, str]:
+    def validate_frequency_range(self, min_freq: float, max_freq: float) -> tuple[bool, str]:
         """
         Validate if the frequency range is supported by the current configuration.
-        
+
         Returns:
             Tuple[bool, str]: (is_valid, message)
         """
         nyquist = self.sample_rate / 2.0
-        
+
         if min_freq <= 0:
             return False, f"Minimum frequency must be > 0, got {min_freq}"
         if max_freq <= min_freq:
-            return False, f"Maximum frequency must be > minimum frequency, got {max_freq} <= {min_freq}"
+            return (
+                False,
+                f"Maximum frequency must be > minimum frequency, got {max_freq} <= {min_freq}",
+            )
         if max_freq > nyquist:
-            return False, f"Maximum frequency {max_freq}Hz exceeds Nyquist limit {nyquist}Hz for sample rate {self.sample_rate}Hz"
-        
+            return (
+                False,
+                f"Maximum frequency {max_freq}Hz exceeds Nyquist limit {nyquist}Hz "
+                f"for sample rate {self.sample_rate}Hz",
+            )
+
         return True, "Frequency range is valid"
 
     # Stub methods for base class compatibility
     def enable_auto_exposure(self, enable: bool = True) -> bool:
         """Not applicable for audio capture."""
         return True
-    
+
     def set_exposure(self, value: float) -> bool:
         """Not applicable for audio capture."""
         return True
-    
+
     def get_exposure(self) -> Optional[float]:
         """Not applicable for audio capture."""
         return None
-    
+
     def set_gain(self, value: float) -> bool:
         """Audio gain control could be implemented here."""
         return True
-    
+
     def get_gain(self) -> Optional[float]:
         """Audio gain control could be implemented here."""
         return None
-    
+
     def _fixed_normalize(self, mel_db: np.ndarray) -> np.ndarray:
         """
         Apply fixed dB range normalization.
-        
+
         Args:
             mel_db: Mel spectrogram in dB
-            
+
         Returns:
             np.ndarray: Normalized spectrogram [0, 1]
         """
         return np.clip((mel_db - self.db_range[0]) / (self.db_range[1] - self.db_range[0]), 0, 1)
-    
+
     def _adaptive_normalize(self, mel_db: np.ndarray) -> np.ndarray:
         """
         Apply adaptive normalization based on current frame statistics.
-        
+
         Args:
             mel_db: Mel spectrogram in dB
-            
+
         Returns:
             np.ndarray: Normalized spectrogram [0, 1]
         """
@@ -732,44 +789,48 @@ class AudioSpectrogramCapture(VideoCaptureBase):
         if self._adaptive_min is None or self._adaptive_max is None:
             self._adaptive_min = np.min(mel_db)
             self._adaptive_max = np.max(mel_db)
-        
+
         # Update adaptive min/max values using exponential moving average
         current_min = np.min(mel_db)
         current_max = np.max(mel_db)
-        
-        self._adaptive_min = self.adaptive_alpha * self._adaptive_min + (1 - self.adaptive_alpha) * current_min
-        self._adaptive_max = self.adaptive_alpha * self._adaptive_max + (1 - self.adaptive_alpha) * current_max
-        
+
+        self._adaptive_min = (
+            self.adaptive_alpha * self._adaptive_min + (1 - self.adaptive_alpha) * current_min
+        )
+        self._adaptive_max = (
+            self.adaptive_alpha * self._adaptive_max + (1 - self.adaptive_alpha) * current_max
+        )
+
         # Ensure we don't divide by zero
         range_val = max(self._adaptive_max - self._adaptive_min, 1e-10)
-        
+
         # Normalize
         normalized = (mel_db - self._adaptive_min) / range_val
         return np.clip(normalized, 0, 1)
-    
+
     def _percentile_normalize(self, mel_db: np.ndarray) -> np.ndarray:
         """
         Apply percentile-based normalization for robust contrast.
-        
+
         Args:
             mel_db: Mel spectrogram in dB
-            
+
         Returns:
             np.ndarray: Normalized spectrogram [0, 1]
         """
         # Calculate percentiles
         low_percentile = np.percentile(mel_db, self.percentile_range[0])
         high_percentile = np.percentile(mel_db, self.percentile_range[1])
-        
+
         # Ensure we don't divide by zero
         range_val = max(high_percentile - low_percentile, 1e-10)
-        
+
         # Normalize
         normalized = (mel_db - low_percentile) / range_val
         return np.clip(normalized, 0, 1)
 
     @classmethod
-    def discover(cls) -> List[DeviceInfo]:
+    def discover(cls) -> list[DeviceInfo]:
         """
         Discover available audio input devices (microphones).
 
@@ -782,48 +843,48 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             logger.warning("Audio dependencies not available. Cannot discover audio devices.")
             return []
 
-        devices: List[DeviceInfo] = []
-        
+        devices: list[DeviceInfo] = []
+
         try:
             p = pyaudio.PyAudio()
-            
+
             # Get device count
             device_count = p.get_device_count()
-            
+
             for i in range(device_count):
                 try:
                     device_info = p.get_device_info_by_index(i)
-                    
+
                     # Only include input devices (microphones)
-                    max_input_channels = device_info.get('maxInputChannels', 0)
+                    max_input_channels = device_info.get("maxInputChannels", 0)
                     if isinstance(max_input_channels, (int, float)) and max_input_channels > 0:
                         device_data = DeviceInfo(
                             device_id=str(i),
                             index=i,
-                            name=device_info['name'],
-                            driver='pyaudio',
+                            name=device_info["name"],
+                            driver="pyaudio",
                             id_stable=False,
                             metadata={
-                                'channels': device_info['maxInputChannels'],
-                                'sample_rate': device_info['defaultSampleRate'],
+                                "channels": device_info["maxInputChannels"],
+                                "sample_rate": device_info["defaultSampleRate"],
                             },
                         )
                         devices.append(device_data)
                         logger.info(f"Found audio input device: {device_data}")
-                        
+
                 except Exception as e:
                     logger.warning(f"Could not get info for audio device {i}: {e}")
                     continue
-            
+
             p.terminate()
-            
+
         except Exception as e:
             logger.error(f"Error discovering audio devices: {e}")
-        
+
         return devices
 
     @classmethod
-    def get_config_schema(cls) -> Dict[str, Any]:
+    def get_config_schema(cls) -> dict[str, Any]:
         """Get configuration schema for audio spectrogram capture"""
         warnings.warn(
             "get_config_schema() is deprecated and will be removed in a future release; "
@@ -832,174 +893,176 @@ class AudioSpectrogramCapture(VideoCaptureBase):
             stacklevel=2,
         )
         return {
-            'title': 'Audio Spectrogram Configuration',
-            'description': 'Configure audio spectrogram capture from microphones or audio files',
-            'fields': [
+            "title": "Audio Spectrogram Configuration",
+            "description": "Configure audio spectrogram capture from microphones or audio files",
+            "fields": [
                 {
-                    'name': 'source',
-                    'label': 'Audio Source',
-                    'type': 'text',
-                    'placeholder': '0 or /path/to/audio.wav',
-                    'description': 'Microphone index (0, 1, 2...) or path to audio file',
-                    'required': False,
-                    'default': 0
+                    "name": "source",
+                    "label": "Audio Source",
+                    "type": "text",
+                    "placeholder": "0 or /path/to/audio.wav",
+                    "description": "Microphone index (0, 1, 2...) or path to audio file",
+                    "required": False,
+                    "default": 0,
                 },
                 {
-                    'name': 'n_mels',
-                    'label': 'Mel Bands',
-                    'type': 'number',
-                    'min': 32,
-                    'max': 256,
-                    'placeholder': '128',
-                    'description': 'Number of mel frequency bands in spectrogram',
-                    'required': False,
-                    'default': 128
+                    "name": "n_mels",
+                    "label": "Mel Bands",
+                    "type": "number",
+                    "min": 32,
+                    "max": 256,
+                    "placeholder": "128",
+                    "description": "Number of mel frequency bands in spectrogram",
+                    "required": False,
+                    "default": 128,
                 },
                 {
-                    'name': 'n_fft',
-                    'label': 'FFT Window Size',
-                    'type': 'select',
-                    'options': [
-                        {'value': 512, 'label': '512'},
-                        {'value': 1024, 'label': '1024'},
-                        {'value': 2048, 'label': '2048'},
-                        {'value': 4096, 'label': '4096'}
+                    "name": "n_fft",
+                    "label": "FFT Window Size",
+                    "type": "select",
+                    "options": [
+                        {"value": 512, "label": "512"},
+                        {"value": 1024, "label": "1024"},
+                        {"value": 2048, "label": "2048"},
+                        {"value": 4096, "label": "4096"},
                     ],
-                    'description': 'FFT window size for frequency analysis',
-                    'required': False,
-                    'default': 2048
+                    "description": "FFT window size for frequency analysis",
+                    "required": False,
+                    "default": 2048,
                 },
                 {
-                    'name': 'hop_length',
-                    'label': 'Hop Length',
-                    'type': 'number',
-                    'min': 128,
-                    'max': 2048,
-                    'placeholder': '512',
-                    'description': 'Number of samples between successive frames',
-                    'required': False,
-                    'default': 512
+                    "name": "hop_length",
+                    "label": "Hop Length",
+                    "type": "number",
+                    "min": 128,
+                    "max": 2048,
+                    "placeholder": "512",
+                    "description": "Number of samples between successive frames",
+                    "required": False,
+                    "default": 512,
                 },
                 {
-                    'name': 'window_duration',
-                    'label': 'Window Duration (s)',
-                    'type': 'number',
-                    'min': 0.5,
-                    'max': 10.0,
-                    'step': 0.1,
-                    'placeholder': '2.0',
-                    'description': 'Duration of audio window in seconds',
-                    'required': False,
-                    'default': 2.0
+                    "name": "window_duration",
+                    "label": "Window Duration (s)",
+                    "type": "number",
+                    "min": 0.5,
+                    "max": 10.0,
+                    "step": 0.1,
+                    "placeholder": "2.0",
+                    "description": "Duration of audio window in seconds",
+                    "required": False,
+                    "default": 2.0,
                 },
                 {
-                    'name': 'sample_rate',
-                    'label': 'Sample Rate (Hz)',
-                    'type': 'select',
-                    'options': [
-                        {'value': 22050, 'label': '22050'},
-                        {'value': 44100, 'label': '44100'},
-                        {'value': 48000, 'label': '48000'},
-                        {'value': 96000, 'label': '96000'}
+                    "name": "sample_rate",
+                    "label": "Sample Rate (Hz)",
+                    "type": "select",
+                    "options": [
+                        {"value": 22050, "label": "22050"},
+                        {"value": 44100, "label": "44100"},
+                        {"value": 48000, "label": "48000"},
+                        {"value": 96000, "label": "96000"},
                     ],
-                    'description': 'Audio sample rate in Hz',
-                    'required': False,
-                    'default': 44100
+                    "description": "Audio sample rate in Hz",
+                    "required": False,
+                    "default": 44100,
                 },
                 {
-                    'name': 'freq_range',
-                    'label': 'Frequency Range (Hz)',
-                    'type': 'text',
-                    'placeholder': '20,8000',
-                    'description': 'Frequency range as "min,max" (e.g., "20,8000")',
-                    'required': False,
-                    'default': '20,8000'
+                    "name": "freq_range",
+                    "label": "Frequency Range (Hz)",
+                    "type": "text",
+                    "placeholder": "20,8000",
+                    "description": 'Frequency range as "min,max" (e.g., "20,8000")',
+                    "required": False,
+                    "default": "20,8000",
                 },
                 {
-                    'name': 'frame_rate',
-                    'label': 'Frame Rate (FPS)',
-                    'type': 'number',
-                    'min': 1,
-                    'max': 60,
-                    'placeholder': '30',
-                    'description': 'Spectrogram update rate in frames per second',
-                    'required': False,
-                    'default': 30
+                    "name": "frame_rate",
+                    "label": "Frame Rate (FPS)",
+                    "type": "number",
+                    "min": 1,
+                    "max": 60,
+                    "placeholder": "30",
+                    "description": "Spectrogram update rate in frames per second",
+                    "required": False,
+                    "default": 30,
                 },
                 {
-                    'name': 'colormap',
-                    'label': 'Color Map',
-                    'type': 'select',
-                    'options': [
-                        {'value': '', 'label': 'Grayscale'},
-                        {'value': 'JET', 'label': 'Jet'},
-                        {'value': 'HOT', 'label': 'Hot'},
-                        {'value': 'VIRIDIS', 'label': 'Viridis'},
-                        {'value': 'PLASMA', 'label': 'Plasma'},
-                        {'value': 'INFERNO', 'label': 'Inferno'},
-                        {'value': 'MAGMA', 'label': 'Magma'},
-                        {'value': 'TURBO', 'label': 'Turbo'},
-                        {'value': 'RAINBOW', 'label': 'Rainbow'},
-                        {'value': 'OCEAN', 'label': 'Ocean'},
-                        {'value': 'COOL', 'label': 'Cool'},
-                        {'value': 'SPRING', 'label': 'Spring'},
-                        {'value': 'SUMMER', 'label': 'Summer'},
-                        {'value': 'AUTUMN', 'label': 'Autumn'},
-                        {'value': 'WINTER', 'label': 'Winter'}
+                    "name": "colormap",
+                    "label": "Color Map",
+                    "type": "select",
+                    "options": [
+                        {"value": "", "label": "Grayscale"},
+                        {"value": "JET", "label": "Jet"},
+                        {"value": "HOT", "label": "Hot"},
+                        {"value": "VIRIDIS", "label": "Viridis"},
+                        {"value": "PLASMA", "label": "Plasma"},
+                        {"value": "INFERNO", "label": "Inferno"},
+                        {"value": "MAGMA", "label": "Magma"},
+                        {"value": "TURBO", "label": "Turbo"},
+                        {"value": "RAINBOW", "label": "Rainbow"},
+                        {"value": "OCEAN", "label": "Ocean"},
+                        {"value": "COOL", "label": "Cool"},
+                        {"value": "SPRING", "label": "Spring"},
+                        {"value": "SUMMER", "label": "Summer"},
+                        {"value": "AUTUMN", "label": "Autumn"},
+                        {"value": "WINTER", "label": "Winter"},
                     ],
-                    'description': 'Color mapping for spectrogram visualization',
-                    'required': False,
-                    'default': ''
+                    "description": "Color mapping for spectrogram visualization",
+                    "required": False,
+                    "default": "",
                 },
                 {
-                    'name': 'contrast_method',
-                    'label': 'Contrast Method',
-                    'type': 'select',
-                    'options': [
-                        {'value': 'fixed', 'label': 'Fixed Range'},
-                        {'value': 'adaptive', 'label': 'Adaptive'},
-                        {'value': 'percentile', 'label': 'Percentile'}
+                    "name": "contrast_method",
+                    "label": "Contrast Method",
+                    "type": "select",
+                    "options": [
+                        {"value": "fixed", "label": "Fixed Range"},
+                        {"value": "adaptive", "label": "Adaptive"},
+                        {"value": "percentile", "label": "Percentile"},
                     ],
-                    'description': 'Method for contrast enhancement',
-                    'required': False,
-                    'default': 'fixed'
+                    "description": "Method for contrast enhancement",
+                    "required": False,
+                    "default": "fixed",
                 },
                 {
-                    'name': 'gamma_correction',
-                    'label': 'Gamma Correction',
-                    'type': 'number',
-                    'min': 0.1,
-                    'max': 3.0,
-                    'step': 0.1,
-                    'placeholder': '1.0',
-                    'description': 'Gamma correction for contrast (< 1.0 increases contrast)',
-                    'required': False,
-                    'default': 1.0
+                    "name": "gamma_correction",
+                    "label": "Gamma Correction",
+                    "type": "number",
+                    "min": 0.1,
+                    "max": 3.0,
+                    "step": 0.1,
+                    "placeholder": "1.0",
+                    "description": "Gamma correction for contrast (< 1.0 increases contrast)",
+                    "required": False,
+                    "default": 1.0,
                 },
                 {
-                    'name': 'noise_floor',
-                    'label': 'Noise Floor (dB)',
-                    'type': 'number',
-                    'min': -100,
-                    'max': -20,
-                    'placeholder': '-70',
-                    'description': 'Noise floor in dB to suppress background noise',
-                    'required': False,
-                    'default': -70
-                }
-            ]
+                    "name": "noise_floor",
+                    "label": "Noise Floor (dB)",
+                    "type": "number",
+                    "min": -100,
+                    "max": -20,
+                    "placeholder": "-70",
+                    "description": "Noise floor in dB to suppress background noise",
+                    "required": False,
+                    "default": -70,
+                },
+            ],
         }
 
 
 if __name__ == "__main__":
-    import queue
     import threading
-    import time
+
     import cv2
 
     # Example usage: Capture spectrograms from multiple audio sources (microphones or files)
-    
+
     devices = AudioSpectrogramCapture.discover()
     print(f"Discovered {len(devices)} audio input devices:")
     for device in devices:
-       print(f" - {device['name']} (Index: {device['index']}, Channels: {device['channels']}, Sample Rate: {device['sample_rate']})")
+        print(
+            f" - {device['name']} (Index: {device['index']}, "
+            f"Channels: {device['channels']}, Sample Rate: {device['sample_rate']})"
+        )

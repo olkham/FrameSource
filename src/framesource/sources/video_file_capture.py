@@ -1,10 +1,12 @@
-from typing import Optional, Tuple, Any, Dict
-import numpy as np
-import cv2
 import logging
-import warnings
-from .video_capture_base import VideoCaptureBase
 import time
+import warnings
+from typing import Any, Optional
+
+import cv2
+import numpy as np
+
+from .video_capture_base import VideoCaptureBase
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +14,21 @@ logger = logging.getLogger(__name__)
 class VideoFileCapture(VideoCaptureBase):
     has_discovery = False  # Uses file paths, not discoverable devices
     supports_exposure = False  # Video files have no controllable exposure
-    supports_gain = False      # Video files have no controllable gain
+    supports_gain = False  # Video files have no controllable gain
 
     """Video file capture using OpenCV."""
 
-    def __init__(self, source: str, *, loop: bool = False, real_time: bool = True,
-                 width: Optional[int] = None, height: Optional[int] = None,
-                 fps: Optional[float] = None, **kwargs):
+    def __init__(
+        self,
+        source: str,
+        *,
+        loop: bool = False,
+        real_time: bool = True,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        fps: Optional[float] = None,
+        **kwargs,
+    ):
         """Initialize the video file capture.
 
         Args:
@@ -33,8 +43,13 @@ class VideoFileCapture(VideoCaptureBase):
         """
         # Forward the promoted options back into ``self.config`` so behaviour
         # that reads them (``connect()`` for width/height/fps) is preserved.
-        for _key, _val in (('loop', loop), ('real_time', real_time),
-                           ('width', width), ('height', height), ('fps', fps)):
+        for _key, _val in (
+            ("loop", loop),
+            ("real_time", real_time),
+            ("width", width),
+            ("height", height),
+            ("fps", fps),
+        ):
             if _val is not None:
                 kwargs[_key] = _val
         super().__init__(source, **kwargs)
@@ -42,7 +57,7 @@ class VideoFileCapture(VideoCaptureBase):
         self.loop = loop
         self.real_time = real_time
         self.time_of_last_frame = 0.0
-        
+
     def connect(self) -> bool:
         """Connect to video file."""
         try:
@@ -50,22 +65,22 @@ class VideoFileCapture(VideoCaptureBase):
             if not self.cap.isOpened():
                 logger.error(f"Failed to open video file {self.source}")
                 return False
-            
+
             # Set additional parameters if provided
-            if 'width' in self.config:
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config['width'])
-            if 'height' in self.config:
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config['height'])
-            if 'fps' in self.config:
-                self.cap.set(cv2.CAP_PROP_FPS, self.config['fps'])
-                
+            if "width" in self.config:
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config["width"])
+            if "height" in self.config:
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config["height"])
+            if "fps" in self.config:
+                self.cap.set(cv2.CAP_PROP_FPS, self.config["fps"])
+
             self.is_connected = True
             logger.info(f"Connected to video file {self.source}")
             return True
         except Exception as e:
             logger.error(f"Error connecting to video file: {e}")
             return False
-    
+
     def disconnect(self) -> bool:
         """Disconnect from video file."""
         try:
@@ -78,8 +93,8 @@ class VideoFileCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error disconnecting from video file: {e}")
             return False
-    
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
         Read a single frame from the video file.
         Returns:
@@ -105,21 +120,21 @@ class VideoFileCapture(VideoCaptureBase):
             if self.real_time:
                 self.time_of_last_frame = time.time()
         return ret, frame if ret else None
-    
+
     def set_exposure(self, value: float) -> bool:
         """Set exposure (not applicable for video files)."""
         logger.warning("Exposure control not applicable for video files")
         return False
-    
+
     def get_exposure(self) -> Optional[float]:
         """Get exposure (not applicable for video files)."""
         return None
-    
+
     def set_gain(self, value: float) -> bool:
         """Set gain (not applicable for video files)."""
         logger.warning("Gain control not applicable for video files")
         return False
-    
+
     def get_gain(self) -> Optional[float]:
         """Get gain (not applicable for video files)."""
         return None
@@ -127,16 +142,16 @@ class VideoFileCapture(VideoCaptureBase):
     def enable_auto_exposure(self, enable: bool = True) -> bool:
         """
         Enable or disable auto exposure (not applicable for video files).
-        
+
         Args:
             enable: True to enable, False to disable
-        
+
         Returns:
             bool: Always False for video files
         """
         logger.warning("Auto exposure control not applicable for video files")
         return False
-    
+
     def set_frame_size(self, width: int, height: int) -> bool:
         """Set frame size (not applicable for video files)."""
         logger.warning("Setting resolution is not applicable for video files")
@@ -146,7 +161,7 @@ class VideoFileCapture(VideoCaptureBase):
     def discover(cls) -> list:
         """
         Discover method for video file capture.
-        
+
         Returns:
             list: Empty list, as discovery is not applicable for file-based sources.
                 Use this class directly with file paths as the source parameter.
@@ -156,7 +171,7 @@ class VideoFileCapture(VideoCaptureBase):
         return []
 
     @classmethod
-    def get_config_schema(cls) -> Dict[str, Any]:
+    def get_config_schema(cls) -> dict[str, Any]:
         """Get configuration schema for video file capture"""
         warnings.warn(
             "get_config_schema() is deprecated and will be removed in a future release; "
@@ -165,54 +180,59 @@ class VideoFileCapture(VideoCaptureBase):
             stacklevel=2,
         )
         return {
-            'title': 'Video File Configuration',
-            'description': 'Configure video file playback settings',
-            'fields': [
+            "title": "Video File Configuration",
+            "description": "Configure video file playback settings",
+            "fields": [
                 {
-                    'name': 'source',
-                    'label': 'Video File Path',
-                    'type': 'text',
-                    'placeholder': 'C:/path/to/video.mp4',
-                    'description': 'Full path to video file (supports .mp4, .avi, .mov, .mkv, .wmv, .flv, .webm)',
-                    'required': True
+                    "name": "source",
+                    "label": "Video File Path",
+                    "type": "text",
+                    "placeholder": "C:/path/to/video.mp4",
+                    "description": (
+                        "Full path to video file (supports .mp4, .avi, .mov, .mkv, "
+                        ".wmv, .flv, .webm)"
+                    ),
+                    "required": True,
                 },
                 {
-                    'name': 'loop',
-                    'label': 'Loop Playback',
-                    'type': 'checkbox',
-                    'description': 'Restart video from beginning when it ends',
-                    'required': False,
-                    'default': False
+                    "name": "loop",
+                    "label": "Loop Playback",
+                    "type": "checkbox",
+                    "description": "Restart video from beginning when it ends",
+                    "required": False,
+                    "default": False,
                 },
                 {
-                    'name': 'real_time',
-                    'label': 'Real-time Playback',
-                    'type': 'checkbox',
-                    'description': 'Play video at original frame rate (disable for fastest processing)',
-                    'required': False,
-                    'default': True
+                    "name": "real_time",
+                    "label": "Real-time Playback",
+                    "type": "checkbox",
+                    "description": (
+                        "Play video at original frame rate (disable for fastest processing)"
+                    ),
+                    "required": False,
+                    "default": True,
                 },
                 {
-                    'name': 'width',
-                    'label': 'Width',
-                    'type': 'number',
-                    'min': 160,
-                    'max': 4096,
-                    'placeholder': '1920',
-                    'description': 'Resize frame width (optional)',
-                    'required': False
+                    "name": "width",
+                    "label": "Width",
+                    "type": "number",
+                    "min": 160,
+                    "max": 4096,
+                    "placeholder": "1920",
+                    "description": "Resize frame width (optional)",
+                    "required": False,
                 },
                 {
-                    'name': 'height',
-                    'label': 'Height',
-                    'type': 'number',
-                    'min': 120,
-                    'max': 2160,
-                    'placeholder': '1080',
-                    'description': 'Resize frame height (optional)',
-                    'required': False
-                }
-            ]
+                    "name": "height",
+                    "label": "Height",
+                    "type": "number",
+                    "min": 120,
+                    "max": 2160,
+                    "placeholder": "1080",
+                    "description": "Resize frame height (optional)",
+                    "required": False,
+                },
+            ],
         }
 
 
@@ -220,19 +240,19 @@ if __name__ == "__main__":
     # Example usage
     video_file = "path/to/your/video.mp4"  # Replace with your video file path
     camera = VideoFileCapture(source=video_file, loop=True, real_time=True)
-    
+
     if camera.connect():
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
             if ret and frame is not None:
                 cv2.imshow("Webcam", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
         camera.disconnect()
     else:

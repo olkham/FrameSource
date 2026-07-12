@@ -1,24 +1,23 @@
 import importlib
 import logging
 
-from .factory import FrameSourceFactory
-from .threading_utils import (
-    simple_frame_producer,
-    FrameProducer,
-    multiprocess_frame_producer,
-    create_producer_consumer_pair,
-    ProducerConsumer,
-    AsyncFrameSource,
-    SharedProducer,
-)
-
-from .sources.video_capture_base import VideoCaptureBase, Frame, FrameSourceProtocol
 from .discovery import DeviceInfo
 from .errors import (
     FrameSourceError,
     MissingDependencyError,
-    UnknownSourceTypeError,
     NotConnectedError,
+    UnknownSourceTypeError,
+)
+from .factory import FrameSourceFactory
+from .sources.video_capture_base import Frame, FrameSourceProtocol, VideoCaptureBase
+from .threading_utils import (
+    AsyncFrameSource,
+    FrameProducer,
+    ProducerConsumer,
+    SharedProducer,
+    create_producer_consumer_pair,
+    multiprocess_frame_producer,
+    simple_frame_producer,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,6 +27,7 @@ try:
 except Exception:  # pragma: no cover - fallback when not built/installed
     try:
         from importlib.metadata import version as _pkg_version
+
         __version__ = _pkg_version("framesource")
     except Exception:
         __version__ = "0.0.0"
@@ -36,22 +36,22 @@ except Exception:  # pragma: no cover - fallback when not built/installed
 # Import capture classes with graceful handling for missing optional
 # dependencies. Unavailable classes are set to None and logged at debug level.
 _OPTIONAL_CLASSES = {
-    'WebcamCapture': 'webcam_capture',
-    'AudioSpectrogramCapture': 'audiospectrogram_capture',
-    'BaslerCapture': 'basler_capture',
-    'GenicamCapture': 'genicam_capture',
-    'IPCameraCapture': 'ipcamera_capture',
-    'VideoFileCapture': 'video_file_capture',
-    'FolderCapture': 'folder_capture',
-    'RealsenseCapture': 'realsense_capture',
-    'ScreenCapture': 'screen_capture',
-    'XimeaCapture': 'ximea_capture',
-    'HuatengCapture': 'huateng_capture',
+    "WebcamCapture": "webcam_capture",
+    "AudioSpectrogramCapture": "audiospectrogram_capture",
+    "BaslerCapture": "basler_capture",
+    "GenicamCapture": "genicam_capture",
+    "IPCameraCapture": "ipcamera_capture",
+    "VideoFileCapture": "video_file_capture",
+    "FolderCapture": "folder_capture",
+    "RealsenseCapture": "realsense_capture",
+    "ScreenCapture": "screen_capture",
+    "XimeaCapture": "ximea_capture",
+    "HuatengCapture": "huateng_capture",
 }
 
 for _class_name, _module_name in _OPTIONAL_CLASSES.items():
     try:
-        _module = importlib.import_module(f'.sources.{_module_name}', __name__)
+        _module = importlib.import_module(f".sources.{_module_name}", __name__)
         globals()[_class_name] = getattr(_module, _class_name)
     except Exception as e:  # noqa: BLE001 - vendor SDKs may raise non-ImportError
         globals()[_class_name] = None
@@ -59,31 +59,31 @@ for _class_name, _module_name in _OPTIONAL_CLASSES.items():
 
 
 __all__ = [
-    'FrameSourceFactory',
-    'VideoCaptureBase',
-    'Frame',
-    'FrameSourceProtocol',
-    'DeviceInfo',
-    'FrameSourceError',
-    'MissingDependencyError',
-    'UnknownSourceTypeError',
-    'NotConnectedError',
-    'simple_frame_producer',
-    'FrameProducer',
-    'multiprocess_frame_producer',
-    'create_producer_consumer_pair',
-    'ProducerConsumer',
-    'AsyncFrameSource',
-    'SharedProducer',
-    'WebcamCapture',
-    'IPCameraCapture',
-    'BaslerCapture',
-    'GenicamCapture',
-    'RealsenseCapture',
-    'XimeaCapture',
-    'HuatengCapture',
-    'VideoFileCapture',
-    'FolderCapture',
-    'ScreenCapture',
-    'AudioSpectrogramCapture',
+    "FrameSourceFactory",
+    "VideoCaptureBase",
+    "Frame",
+    "FrameSourceProtocol",
+    "DeviceInfo",
+    "FrameSourceError",
+    "MissingDependencyError",
+    "UnknownSourceTypeError",
+    "NotConnectedError",
+    "simple_frame_producer",
+    "FrameProducer",
+    "multiprocess_frame_producer",
+    "create_producer_consumer_pair",
+    "ProducerConsumer",
+    "AsyncFrameSource",
+    "SharedProducer",
+    "WebcamCapture",
+    "IPCameraCapture",
+    "BaslerCapture",
+    "GenicamCapture",
+    "RealsenseCapture",
+    "XimeaCapture",
+    "HuatengCapture",
+    "VideoFileCapture",
+    "FolderCapture",
+    "ScreenCapture",
+    "AudioSpectrogramCapture",
 ]

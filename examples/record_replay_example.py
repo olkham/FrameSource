@@ -35,7 +35,6 @@ import numpy as np
 
 from framesource import FrameSourceFactory
 
-
 MEDIA_DIR = Path(__file__).resolve().parents[1] / "media"
 
 
@@ -86,9 +85,7 @@ def record_phase(src_path: str, n_frames: int, out_dir: str):
     """
     # real_time=True so the recorded timestamps have real inter-frame spacing;
     # loop=True guarantees we can grab n_frames from even a short clip.
-    cap = FrameSourceFactory.create(
-        "video_file", source_id=src_path, real_time=True, loop=True
-    )
+    cap = FrameSourceFactory.create("video_file", source_id=src_path, real_time=True, loop=True)
     records = []
     try:
         for _ in range(n_frames):
@@ -114,11 +111,11 @@ def replay_phase(out_dir: str, fps: float):
     cap = FrameSourceFactory.create(
         "folder",
         source_id=out_dir,
-        sort_by="name",       # zero-padded count => capture order
-        fps=fps,              # reproduce the recorded pacing...
-        real_time=True,       # ...by actually sleeping between frames
+        sort_by="name",  # zero-padded count => capture order
+        fps=fps,  # reproduce the recorded pacing...
+        real_time=True,  # ...by actually sleeping between frames
         loop=False,
-        watch_folder=False,   # no watchdog dependency needed for replay
+        watch_folder=False,  # no watchdog dependency needed for replay
     )
     replayed = []
     try:

@@ -4,13 +4,13 @@ import builtins
 
 import pytest
 
+from framesource import FrameSourceFactory
 from framesource.errors import (
     FrameSourceError,
     MissingDependencyError,
-    UnknownSourceTypeError,
     NotConnectedError,
+    UnknownSourceTypeError,
 )
-from framesource import FrameSourceFactory
 
 
 def test_missing_dependency_error_is_import_error():
@@ -34,41 +34,43 @@ def test_all_errors_derive_from_frame_source_error():
 
 
 def test_missing_dependency_error_message_contains_package_and_install_hint():
-    err = MissingDependencyError('pyaudio', extra='audio')
+    err = MissingDependencyError("pyaudio", extra="audio")
     message = str(err)
-    assert 'pyaudio' in message
-    assert 'pip install framesource[audio]' in message
+    assert "pyaudio" in message
+    assert "pip install framesource[audio]" in message
 
 
 def test_missing_dependency_error_without_extra_omits_hint():
-    err = MissingDependencyError('somepkg')
+    err = MissingDependencyError("somepkg")
     message = str(err)
-    assert 'somepkg' in message
-    assert 'pip install' not in message
+    assert "somepkg" in message
+    assert "pip install" not in message
 
 
 def test_missing_dependency_error_includes_details():
-    err = MissingDependencyError('librosa/soundfile/pyaudio', extra='audio', details='No module named librosa')
+    err = MissingDependencyError(
+        "librosa/soundfile/pyaudio", extra="audio", details="No module named librosa"
+    )
     message = str(err)
-    assert 'No module named librosa' in message
+    assert "No module named librosa" in message
 
 
 def test_missing_dependency_error_stores_attributes():
-    err = MissingDependencyError('pyaudio', extra='audio')
-    assert err.package == 'pyaudio'
-    assert err.extra == 'audio'
+    err = MissingDependencyError("pyaudio", extra="audio")
+    assert err.package == "pyaudio"
+    assert err.extra == "audio"
 
 
 def test_factory_unknown_type_raises_unknown_source_type_error():
     with pytest.raises(UnknownSourceTypeError):
-        FrameSourceFactory.create('definitely_not_a_type', source_id=0)
+        FrameSourceFactory.create("definitely_not_a_type", source_id=0)
 
 
 def test_factory_unknown_type_still_caught_by_value_error():
     # Backwards compatibility: old user code catching plain ValueError
     # must keep working.
     with pytest.raises(ValueError):
-        FrameSourceFactory.create('definitely_not_a_type', source_id=0)
+        FrameSourceFactory.create("definitely_not_a_type", source_id=0)
 
 
 # --------------------------------------------------------------------------- #
@@ -81,6 +83,7 @@ def test_factory_unknown_type_still_caught_by_value_error():
 # test_from_config.py. This keeps the tests deterministic and hardware-free.
 # --------------------------------------------------------------------------- #
 
+
 def _poison_import(monkeypatch, *blocked_names):
     """Make ``import <name>`` raise ImportError for any of ``blocked_names``.
 
@@ -90,7 +93,7 @@ def _poison_import(monkeypatch, *blocked_names):
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
-        if any(name == blocked or name.startswith(blocked + '.') for blocked in blocked_names):
+        if any(name == blocked or name.startswith(blocked + ".") for blocked in blocked_names):
             raise ImportError(f"No module named '{name}'")
         return real_import(name, *args, **kwargs)
 
@@ -107,8 +110,8 @@ def test_basler_missing_pypylon_raises_missing_dependency_error(monkeypatch):
     err = excinfo.value
     assert isinstance(err, ImportError)
     message = str(err)
-    assert 'pypylon' in message
-    assert 'pip install framesource[basler]' in message
+    assert "pypylon" in message
+    assert "pip install framesource[basler]" in message
 
 
 def test_ximea_missing_sdk_raises_missing_dependency_error(monkeypatch):
@@ -121,11 +124,11 @@ def test_ximea_missing_sdk_raises_missing_dependency_error(monkeypatch):
     err = excinfo.value
     assert isinstance(err, ImportError)
     message = str(err)
-    assert 'ximea' in message.lower()
+    assert "ximea" in message.lower()
     # No pip extra exists for Ximea; the message should instead point at the
     # vendor SDK download.
-    assert 'pip install' not in message
-    assert 'ximea.com' in message
+    assert "pip install" not in message
+    assert "ximea.com" in message
 
 
 def test_genicam_missing_harvesters_raises_missing_dependency_error(monkeypatch):
@@ -138,8 +141,8 @@ def test_genicam_missing_harvesters_raises_missing_dependency_error(monkeypatch)
     err = excinfo.value
     assert isinstance(err, ImportError)
     message = str(err)
-    assert 'harvesters' in message
-    assert 'pip install framesource[genicam]' in message
+    assert "harvesters" in message
+    assert "pip install framesource[genicam]" in message
 
 
 def test_realsense_missing_pyrealsense2_raises_on_connect(monkeypatch):
@@ -156,8 +159,8 @@ def test_realsense_missing_pyrealsense2_raises_on_connect(monkeypatch):
     err = excinfo.value
     assert isinstance(err, ImportError)
     message = str(err)
-    assert 'pyrealsense2' in message
-    assert 'pip install framesource[realsense]' in message
+    assert "pyrealsense2" in message
+    assert "pip install framesource[realsense]" in message
 
 
 def test_huateng_missing_mvsdk_raises_on_connect(monkeypatch):
@@ -178,6 +181,6 @@ def test_huateng_missing_mvsdk_raises_on_connect(monkeypatch):
     err = excinfo.value
     assert isinstance(err, ImportError)
     message = str(err)
-    assert 'mvsdk' in message
+    assert "mvsdk" in message
     # No pip extra exists for the Huateng/MindVision vendor SDK.
-    assert 'pip install' not in message
+    assert "pip install" not in message

@@ -10,16 +10,15 @@ import threading
 import time
 
 import pytest
+from conftest import MockCapture
 
 from framesource import Frame, FrameProducer
 from framesource.threading_utils import simple_frame_producer
 
-from conftest import MockCapture
-
 
 def test_simple_frame_producer_fills_queue():
     camera = MockCapture()
-    frame_queue: "queue.Queue" = queue.Queue(maxsize=10)
+    frame_queue: queue.Queue = queue.Queue(maxsize=10)
     stop_event = threading.Event()
 
     producer = threading.Thread(
@@ -83,7 +82,7 @@ def test_webcam_external_threading():
     from framesource import WebcamCapture
 
     camera = WebcamCapture(source=0)
-    frame_queue: "queue.Queue" = queue.Queue(maxsize=10)
+    frame_queue: queue.Queue = queue.Queue(maxsize=10)
     stop_event = threading.Event()
     producer = threading.Thread(
         target=simple_frame_producer,

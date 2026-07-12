@@ -18,7 +18,7 @@ def _webcam_like():
 
 def test_getitem_field_and_alias():
     d = _webcam_like()
-    assert d["id"] == "700:0:/dev/video0"          # alias -> device_id
+    assert d["id"] == "700:0:/dev/video0"  # alias -> device_id
     assert d["device_id"] == "700:0:/dev/video0"
     assert d["name"] == "Integrated Camera"
     assert d["index"] == 0

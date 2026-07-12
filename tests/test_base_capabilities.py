@@ -11,10 +11,9 @@ import time
 
 import numpy as np
 import pytest
+from conftest import MockCapture
 
 from framesource import Frame
-
-from conftest import MockCapture
 
 
 def _make_frame():
@@ -25,6 +24,7 @@ def _make_frame():
 # ---------------------------------------------------------------------------
 # Frame.monotonic
 # ---------------------------------------------------------------------------
+
 
 def test_frame_has_monotonic_close_to_now():
     frame = _make_frame()
@@ -72,6 +72,7 @@ def test_monotonic_explicit_value():
 # fps_actual
 # ---------------------------------------------------------------------------
 
+
 def test_fps_actual_none_before_two_reads():
     cap = MockCapture()
     cap.connect()
@@ -111,6 +112,7 @@ def test_fps_actual_uses_monotonic_field():
 # wait_until_ready
 # ---------------------------------------------------------------------------
 
+
 def test_wait_until_ready_true_when_connected():
     cap = MockCapture()
     cap.connect()
@@ -134,6 +136,7 @@ def test_wait_until_ready_false_on_timeout():
 # Iterator protocol
 # ---------------------------------------------------------------------------
 
+
 def test_iterator_yields_frames_then_stops():
     cap = MockCapture(max_frames=3)
     cap.connect()
@@ -152,6 +155,7 @@ def test_iter_returns_self():
 # ---------------------------------------------------------------------------
 # Capability flags
 # ---------------------------------------------------------------------------
+
 
 def test_capability_flags_base_defaults():
     cap = MockCapture()

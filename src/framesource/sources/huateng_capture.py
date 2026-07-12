@@ -1,9 +1,11 @@
-from typing import Optional, Tuple, Any
-import numpy as np
 import logging
 import platform
-from .video_capture_base import VideoCaptureBase
+from typing import Any, Optional
+
+import numpy as np
+
 from ..errors import MissingDependencyError
+from .video_capture_base import VideoCaptureBase
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ except (ImportError, OSError) as e:
     mvsdk = None
     _MVSDK_IMPORT_ERROR = str(e)
     logger.warning(f"Huateng mvsdk SDK unavailable: {e}")
+
 
 class HuatengCapture(VideoCaptureBase):
     supports_exposure = True
@@ -40,7 +43,7 @@ class HuatengCapture(VideoCaptureBase):
         # Preserve the historical ``self.config`` contents: only forward an
         # explicitly-provided value.
         if is_mono is not None:
-            kwargs['is_mono'] = is_mono
+            kwargs["is_mono"] = is_mono
         super().__init__(source, **kwargs)
         self.hCamera = -1
         self.nDev = 0
@@ -48,7 +51,7 @@ class HuatengCapture(VideoCaptureBase):
         self.pFrameBuffer = None
         self.frame = None
         self.DevInfo = None
-        self.is_mono = self.config.get('is_mono', False)
+        self.is_mono = self.config.get("is_mono", False)
         self.current_exp = 0
         self.current_gain = 0
         self.prop_frame_height = None
@@ -59,7 +62,7 @@ class HuatengCapture(VideoCaptureBase):
     def connect(self) -> bool:
         if mvsdk is None:
             raise MissingDependencyError(
-                'mvsdk (Huateng/MindVision SDK)',
+                "mvsdk (Huateng/MindVision SDK)",
                 extra=None,
                 details=_MVSDK_IMPORT_ERROR,
             )
@@ -73,7 +76,7 @@ class HuatengCapture(VideoCaptureBase):
             self.DevInfo = self.DevList[i]
             self.hCamera = mvsdk.CameraInit(self.DevInfo, -1, -1)
             self.capability = mvsdk.CameraGetCapability(self.hCamera)
-            monoCamera = (self.capability.sIspCapacity.bMonoSensor != 0)
+            monoCamera = self.capability.sIspCapacity.bMonoSensor != 0
             if monoCamera:
                 mvsdk.CameraSetIspOutFormat(self.hCamera, mvsdk.CAMERA_MEDIA_TYPE_MONO8)
             else:
@@ -81,7 +84,11 @@ class HuatengCapture(VideoCaptureBase):
             mvsdk.CameraSetTriggerMode(self.hCamera, 0)
             mvsdk.CameraSetAeState(self.hCamera, 1)
             mvsdk.CameraPlay(self.hCamera)
-            FrameBufferSize = self.capability.sResolutionRange.iWidthMax * self.capability.sResolutionRange.iHeightMax * (1 if monoCamera else 3)
+            FrameBufferSize = (
+                self.capability.sResolutionRange.iWidthMax
+                * self.capability.sResolutionRange.iHeightMax
+                * (1 if monoCamera else 3)
+            )
             self.pFrameBuffer = mvsdk.CameraAlignMalloc(FrameBufferSize, 16)
             self.prop_frame_height = self.capability.sResolutionRange.iHeightMax
             self.prop_frame_width = self.capability.sResolutionRange.iWidthMax
@@ -107,7 +114,7 @@ class HuatengCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from Huateng camera: {e}")
             return False
 
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         if not self.is_connected or self.hCamera == -1:
             return False, None
         try:
@@ -118,7 +125,13 @@ class HuatengCapture(VideoCaptureBase):
                 mvsdk.CameraFlipFrameBuffer(self.pFrameBuffer, FrameHead, 1)
             frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(self.pFrameBuffer)
             frame = np.frombuffer(frame_data, dtype=np.uint8)
-            frame = frame.reshape((FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
+            frame = frame.reshape(
+                (
+                    FrameHead.iHeight,
+                    FrameHead.iWidth,
+                    1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3,
+                )
+            )
             return True, frame
         except Exception as e:
             logger.error(f"Error reading from Huateng camera: {e}")
@@ -165,7 +178,7 @@ class HuatengCapture(VideoCaptureBase):
             logger.error(f"Error setting auto exposure: {e}")
             return False
 
-    def get_exposure_range(self) -> Optional[Tuple[float, float]]:
+    def get_exposure_range(self) -> Optional[tuple[float, float]]:
         try:
             min_exp = 5
             max_exp = 31 * 1000
@@ -173,7 +186,7 @@ class HuatengCapture(VideoCaptureBase):
         except Exception:
             return None
 
-    def get_gain_range(self) -> Optional[Tuple[float, float]]:
+    def get_gain_range(self) -> Optional[tuple[float, float]]:
         try:
             min_gain = 2
             max_gain = 6
@@ -181,7 +194,7 @@ class HuatengCapture(VideoCaptureBase):
         except Exception:
             return None
 
-    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+    def get_frame_size(self) -> Optional[tuple[int, int]]:
         if self.prop_frame_width and self.prop_frame_height:
             return (self.prop_frame_width, self.prop_frame_height)
         return None
@@ -206,22 +219,24 @@ class HuatengCapture(VideoCaptureBase):
         # Not directly supported in mvsdk, return False
         return False
 
+
 if __name__ == "__main__":
     # Example usage
     import cv2
+
     camera = HuatengCapture(is_mono=False)
     if camera.connect():
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
             if ret and frame is not None:
                 cv2.imshow("camera", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
         camera.stop()

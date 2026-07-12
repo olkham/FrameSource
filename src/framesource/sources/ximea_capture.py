@@ -1,10 +1,13 @@
-from typing import Optional, Tuple
-import numpy as np
 import logging
-from .video_capture_base import VideoCaptureBase
+from typing import Optional
+
+import numpy as np
+
 from ..errors import MissingDependencyError
+from .video_capture_base import VideoCaptureBase
 
 logger = logging.getLogger(__name__)
+
 
 class XimeaCapture(VideoCaptureBase):
     supports_exposure = True
@@ -12,9 +15,15 @@ class XimeaCapture(VideoCaptureBase):
 
     """Ximea camera capture using xiapi."""
 
-    def __init__(self, source: int = 0, *, is_mono: Optional[bool] = None,
-                 exposure: Optional[float] = None, gain: Optional[float] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        source: int = 0,
+        *,
+        is_mono: Optional[bool] = None,
+        exposure: Optional[float] = None,
+        gain: Optional[float] = None,
+        **kwargs,
+    ):
         """Initialize the Ximea capture.
 
         Args:
@@ -36,7 +45,9 @@ class XimeaCapture(VideoCaptureBase):
         # explicitly-provided values so the ``'exposure' in self.config``
         # style presence checks in connect() keep their old meaning.
         for _key, _val in (
-            ('is_mono', is_mono), ('exposure', exposure), ('gain', gain),
+            ("is_mono", is_mono),
+            ("exposure", exposure),
+            ("gain", gain),
         ):
             if _val is not None:
                 kwargs[_key] = _val
@@ -44,10 +55,11 @@ class XimeaCapture(VideoCaptureBase):
         self.cam = None
         try:
             from ximea import xiapi
+
             self.xiapi = xiapi
         except ImportError as e:
             raise MissingDependencyError(
-                'ximea',
+                "ximea",
                 extra=None,
                 details=(
                     f"{e}; no pip extra is available for the Ximea xiapi bindings. "
@@ -57,17 +69,18 @@ class XimeaCapture(VideoCaptureBase):
                 ),
             ) from e
 
-        self.is_mono = self.config.get('is_mono', False)
+        self.is_mono = self.config.get("is_mono", False)
 
     def connect(self) -> bool:
         """Connect to Ximea camera."""
         if self.xiapi is None:
             logger.error("Ximea xiapi not available")
             return False
-        
+
         try:
             self.cam = self.xiapi.Camera()
-            # self.cam.open_device_by_SN(self.source) if isinstance(self.source, str) else self.cam.open_device(self.source)
+            # self.cam.open_device_by_SN(self.source) if isinstance(self.source, str)
+            # else self.cam.open_device(self.source)
             self.cam.open_device()
             # self.cam.set_imgdataformat('XI_RGB24')
             # Get the number of channels from the camera
@@ -92,23 +105,23 @@ class XimeaCapture(VideoCaptureBase):
 
             # Set default parameters
             if not self.is_mono:
-                self.cam.set_imgdataformat('XI_RGB24')
+                self.cam.set_imgdataformat("XI_RGB24")
                 self.cam.enable_auto_wb()
                 # actual channel order = BGR
                 # XI_RGB24 RGB data format. [Blue][Green][Red] (see Note5)
                 # https://www.ximea.com/support/wiki/apis/xiapi_manual
 
             if self.is_mono:
-                self.cam.set_imgdataformat('XI_MONO8')
+                self.cam.set_imgdataformat("XI_MONO8")
 
             self.cam.set_exposure(10000)  # 10ms default
-            
+
             # Apply config parameters
-            if 'exposure' in self.config:
-                self.cam.set_exposure(self.config['exposure'])
-            if 'gain' in self.config:
-                self.cam.set_gain(self.config['gain'])
-            
+            if "exposure" in self.config:
+                self.cam.set_exposure(self.config["exposure"])
+            if "gain" in self.config:
+                self.cam.set_gain(self.config["gain"])
+
             self.cam.start_acquisition()
             self.is_connected = True
             logger.info(f"Connected to Ximea camera {self.source}")
@@ -116,7 +129,7 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error connecting to Ximea camera: {e}")
             return False
-    
+
     def disconnect(self) -> bool:
         """Disconnect from Ximea camera."""
         try:
@@ -130,8 +143,8 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error disconnecting from Ximea camera: {e}")
             return False
-    
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
         Read a single frame from the Ximea camera.
         Returns:
@@ -147,12 +160,12 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error reading from Ximea camera: {e}")
             return False, None
-    
-    def get_exposure_range(self) -> Optional[Tuple[float, float]]:
+
+    def get_exposure_range(self) -> Optional[tuple[float, float]]:
         """Get exposure range in microseconds."""
         if not self.is_connected or self.cam is None:
             return None
-        
+
         try:
             min_exposure = self.cam.get_exposure_minimum()
             max_exposure = self.cam.get_exposure_maximum()
@@ -162,12 +175,12 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error getting exposure range: {e}")
             return None
-        
-    def get_gain_range(self) -> Optional[Tuple[float, float]]:
+
+    def get_gain_range(self) -> Optional[tuple[float, float]]:
         """Get gain range in dB."""
         if not self.is_connected or self.cam is None:
             return None
-        
+
         try:
             min_gain = self.cam.get_gain_minimum()
             max_gain = self.cam.get_gain_maximum()
@@ -182,7 +195,7 @@ class XimeaCapture(VideoCaptureBase):
         """Set exposure in microseconds."""
         if not self.is_connected or self.cam is None:
             return False
-        
+
         try:
             self.cam.set_exposure(int(value))
             self._exposure = value
@@ -190,12 +203,12 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting exposure: {e}")
             return False
-    
+
     def get_exposure(self) -> Optional[float]:
         """Get exposure in microseconds."""
         if not self.is_connected or self.cam is None:
             return self._exposure
-        
+
         try:
             exposure_value = self.cam.get_exposure()
             if exposure_value is not None:
@@ -203,12 +216,12 @@ class XimeaCapture(VideoCaptureBase):
             return self._exposure
         except Exception:
             return self._exposure
-    
+
     def set_gain(self, value: float) -> bool:
         """Set gain in dB."""
         if not self.is_connected or self.cam is None:
             return False
-        
+
         try:
             self.cam.set_gain(value)
             self._gain = value
@@ -216,12 +229,12 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting gain: {e}")
             return False
-    
+
     def get_gain(self) -> Optional[float]:
         """Get gain in dB."""
         if not self.is_connected or self.cam is None:
             return self._gain
-        
+
         try:
             gain_value = self.cam.get_gain()
             if gain_value is not None:
@@ -246,7 +259,7 @@ class XimeaCapture(VideoCaptureBase):
         except Exception as e:
             logger.error(f"Error setting Ximea auto exposure: {e}")
             return False
-    
+
     def set_frame_size(self, width: int, height: int) -> bool:
         """Set frame size for Ximea camera."""
         if not self.is_connected or self.cam is None:
@@ -260,22 +273,24 @@ class XimeaCapture(VideoCaptureBase):
             logger.error(f"Error setting Ximea camera resolution: {e}")
             return False
 
+
 if __name__ == "__main__":
     # Example usage
     import cv2
+
     camera = XimeaCapture(is_mono=False)
     if camera.connect():
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
             if ret or frame is not None:
-                cv2.imshow("Webcam", frame) # type: ignore
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.imshow("Webcam", frame)  # type: ignore
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
         camera.stop()

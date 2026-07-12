@@ -89,6 +89,15 @@ extend-exclude = ["src/framesource/sources/mvsdk.py"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# Deprecation shims must call warnings.warn() before importing the new
+# location, so the imports can't be at the top of the file.
+"src/frame_source/__init__.py" = ["E402"]
+"src/frame_processors/__init__.py" = ["E402"]
+# Vendor-source imports are deliberately grouped with their test section,
+# after earlier test functions, rather than hoisted to the top of the file.
+"tests/test_typed_constructors.py" = ["E402"]
+
 [tool.mypy]
 ignore_missing_imports = true
 

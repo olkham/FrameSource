@@ -34,8 +34,10 @@ class TestHighFrequencyConfig:
 
     def make_capture(self, **kwargs):
         from framesource.sources.audiospectrogram_capture import AudioSpectrogramCapture
-        return AudioSpectrogramCapture(source=None, n_mels=256, window_duration=2.0,
-                                       frame_rate=30, **kwargs)
+
+        return AudioSpectrogramCapture(
+            source=None, n_mels=256, window_duration=2.0, frame_rate=30, **kwargs
+        )
 
     def test_tuple_freq_range_accepted(self):
         camera = self.make_capture(freq_range=(20, 8000))

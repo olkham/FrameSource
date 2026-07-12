@@ -19,7 +19,8 @@ import pytest
 def _frame_source_module_names():
     """Names of the shim package and any aliased submodules in sys.modules."""
     return [
-        name for name in list(sys.modules)
+        name
+        for name in list(sys.modules)
         if name == "frame_source" or name.startswith("frame_source.")
     ]
 

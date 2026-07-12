@@ -1,6 +1,8 @@
 # Test OpenCV compatibility with FrameSourceFactory
-from framesource import FrameSourceFactory
 import cv2
+
+from framesource import FrameSourceFactory
+
 
 def main(framework: str = "opencv"):
     """Run OpenCV compatibility tests."""
@@ -12,7 +14,7 @@ def main(framework: str = "opencv"):
     if framework.lower() == "opencv":
         cap = cv2.VideoCapture(0)
     elif framework.lower() == "framesource":
-        cap = FrameSourceFactory.create('webcam', source_id=0)
+        cap = FrameSourceFactory.create("webcam", source_id=0)
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -23,15 +25,15 @@ def main(framework: str = "opencv"):
         cv2.imshow("Test", frame)
         key = cv2.waitKey(1)
 
-        if key == ord('q'):
+        if key == ord("q"):
             print("Exiting...")
             break
 
-        if key == ord('='):
+        if key == ord("="):
             exp = cap.get(cv2.CAP_PROP_EXPOSURE)
             print(f"Current exposure: {exp}")
             cap.set(cv2.CAP_PROP_EXPOSURE, exp + 1)
-        elif key == ord('-'):
+        elif key == ord("-"):
             exp = cap.get(cv2.CAP_PROP_EXPOSURE)
             print(f"Current exposure: {exp}")
             cap.set(cv2.CAP_PROP_EXPOSURE, exp - 1)

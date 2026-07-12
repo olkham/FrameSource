@@ -1,11 +1,11 @@
 import time
 import uuid as _uuid
+from abc import ABC, abstractmethod
 from collections import deque
+from typing import Any, Optional, Protocol, runtime_checkable
 
 import cv2
 import numpy as np
-from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Any, Protocol, runtime_checkable
 
 
 class Frame(np.ndarray):
@@ -80,6 +80,7 @@ class Frame(np.ndarray):
         self.metadata = meta
         self.monotonic = mono
 
+
 class VideoCaptureBase(ABC):
     # Class attribute indicating if this capture type supports device discovery
     has_discovery = False
@@ -97,7 +98,7 @@ class VideoCaptureBase(ABC):
     def __init__(self, source: Any = None, **kwargs):
         """
         Initialize the capture device.
-        
+
         Args:
             source: Source identifier (device index, URL, etc.)
             **kwargs: Additional parameters specific to the capture type
@@ -111,7 +112,7 @@ class VideoCaptureBase(ABC):
         self.type = self.__class__.__name__
         # Rolling window of recent frame timestamps for fps_actual()
         self._frame_timestamps: deque = deque(maxlen=30)
-        
+
     def __str__(self) -> str:
         return f"{self.type}(source={self.source}, connected={self.is_connected})"
 
@@ -119,24 +120,24 @@ class VideoCaptureBase(ABC):
     def connect(self) -> bool:
         """
         Connect to the capture device.
-        
+
         Returns:
             bool: True if connection successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
     def disconnect(self) -> bool:
         """
         Disconnect from the capture device.
-        
+
         Returns:
             bool: True if disconnection successful, False otherwise
         """
         pass
-    
+
     @abstractmethod
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
         Read a single frame from the capture device.
 
@@ -154,17 +155,16 @@ class VideoCaptureBase(ABC):
     def enable_auto_exposure(self, enable: bool = True) -> bool:
         """
         Enable or disable auto exposure.
-        
+
         Args:
             enable: True to enable, False to disable
-            
+
         Returns:
             bool: True if set successfully, False otherwise
         """
         pass
-    
 
-    def get_exposure_range(self) -> Optional[Tuple[float, float]]:
+    def get_exposure_range(self) -> Optional[tuple[float, float]]:
         """
         Get the minimum and maximum exposure values supported by the device.
         Returns:
@@ -172,126 +172,125 @@ class VideoCaptureBase(ABC):
         """
         return None
 
-    def get_gain_range(self) -> Optional[Tuple[float, float]]:
+    def get_gain_range(self) -> Optional[tuple[float, float]]:
         """
         Get the minimum and maximum gain values supported by the device.
         Returns:
             Optional[Tuple[float, float]]: (min_gain, max_gain) or None if not available
         """
         return None
-    
 
     @abstractmethod
     def set_exposure(self, value: float) -> bool:
         """
         Set exposure value.
-        
+
         Args:
             value: Exposure value (range depends on implementation)
-            
+
         Returns:
             bool: True if set successfully, False otherwise
         """
         pass
-    
+
     @abstractmethod
     def get_exposure(self) -> Optional[float]:
         """
         Get current exposure value.
-        
+
         Returns:
             Optional[float]: Current exposure value or None if not available
         """
         pass
-    
+
     @abstractmethod
     def set_gain(self, value: float) -> bool:
         """
         Set gain value.
-        
+
         Args:
             value: Gain value (range depends on implementation)
-            
+
         Returns:
             bool: True if set successfully, False otherwise
         """
         pass
-    
+
     @abstractmethod
     def get_gain(self) -> Optional[float]:
         """
         Get current gain value.
-        
+
         Returns:
             Optional[float]: Current gain value or None if not available
         """
         pass
-    
+
     @classmethod
     def discover(cls) -> list:
         """
         Discover available devices for this capture type.
-        
+
         Returns:
             list: List of available devices. Format depends on implementation:
                 - For cameras: List of device indices, serial numbers, or device info dicts
                 - For audio: List of microphone devices with info
                 - For network cameras: List of discovered IP cameras
                 - For files: Empty list (no discovery needed)
-        
+
         Note:
             This is a class method that can be called without instantiating the capture class.
             Subclasses should override this method to implement device-specific discovery.
             Default implementation returns empty list.
         """
         return []
-    
-    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+
+    def get_frame_size(self) -> Optional[tuple[int, int]]:
         """
         Get frame dimensions (width, height).
-        
+
         Returns:
             Optional[Tuple[int, int]]: Frame size or None if not available
         """
         return None
-    
+
     def set_frame_size(self, width: int, height: int) -> bool:
         """
         Set frame dimensions.
-        
+
         Args:
             width: Frame width
             height: Frame height
-            
+
         Returns:
             bool: True if set successfully, False otherwise
         """
         return False
-    
+
     def get_fps(self) -> Optional[float]:
         """Get current FPS."""
         return None
-    
+
     def set_fps(self, fps: float) -> bool:
         """Set FPS."""
         return False
-    
+
     def __enter__(self):
         """Context manager entry."""
         if not self.is_connected:
             self.connect()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         if self.is_connected:
             self.disconnect()
-    
+
     def isOpened(self) -> bool:
         """
         Check if the capture device is opened/connected.
         OpenCV-compatible API method.
-        
+
         Returns:
             bool: True if device is connected, False otherwise
         """
@@ -318,12 +317,12 @@ class VideoCaptureBase(ABC):
         """
         if self.is_connected:
             self.disconnect()
-            
+
     def set(self, prop_id: int, value: Any) -> bool:
         """
         Set a property of the capture device.
         OpenCV-compatible API method.
-        
+
         Args:
             prop_id: Property identifier (OpenCV constant)
             value: Value to set
@@ -367,7 +366,7 @@ class VideoCaptureBase(ABC):
         """
         Get a property of the capture device.
         OpenCV-compatible API method.
-        
+
         Args:
             prop_id: Property identifier (OpenCV constant)
         Returns:
@@ -405,27 +404,27 @@ class VideoCaptureBase(ABC):
 
     def attach_processor(self, processor):
         """Attach a frame processor to this camera."""
-        if not hasattr(self, '_processors'):
+        if not hasattr(self, "_processors"):
             self._processors = []
         self._processors.append(processor)
         return processor
-    
+
     def detach_processor(self, processor):
         """Remove a processor from this camera."""
-        if hasattr(self, '_processors'):
+        if hasattr(self, "_processors"):
             if processor in self._processors:
                 self._processors.remove(processor)
                 return True
         return False
-    
+
     def clear_processors(self):
         """Remove all processors."""
-        if hasattr(self, '_processors'):
+        if hasattr(self, "_processors"):
             self._processors.clear()
 
     def get_processors(self):
         """Get all attached processors."""
-        if not hasattr(self, '_processors'):
+        if not hasattr(self, "_processors"):
             self._processors = []
         return self._processors
 
@@ -443,7 +442,7 @@ class VideoCaptureBase(ABC):
             # Use the monotonic clock (not wall-clock timestamp) so fps_actual()
             # stays correct across system clock adjustments.
             self._frame_timestamps.append(frame.monotonic)
-            if hasattr(self, '_processors') and self._processors:
+            if hasattr(self, "_processors") and self._processors:
                 for processor in self._processors:
                     frame = processor.process(frame)
         else:
@@ -556,7 +555,6 @@ class FrameSourceProtocol(Protocol):
 
     def disconnect(self) -> bool: ...
 
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]: ...
+    def read(self) -> tuple[bool, Optional[np.ndarray]]: ...
 
     def is_open(self) -> bool: ...
-

@@ -29,7 +29,6 @@ import numpy as np
 
 from framesource import FrameSourceFactory
 
-
 MEDIA_DIR = Path(__file__).resolve().parents[1] / "media"
 
 
@@ -68,12 +67,18 @@ def make_source(args):
         return FrameSourceFactory.create("webcam", source_id=args.device)
     if args.source == "folder":
         return FrameSourceFactory.create(
-            "folder", source_id=str(MEDIA_DIR / "image_seq"),
-            real_time=False, loop=False, watch_folder=False,
+            "folder",
+            source_id=str(MEDIA_DIR / "image_seq"),
+            real_time=False,
+            loop=False,
+            watch_folder=False,
         )
     # default: a video file, paced as fast as possible for a quick demo
     return FrameSourceFactory.create(
-        "video_file", source_id=demo_video(), real_time=False, loop=False,
+        "video_file",
+        source_id=demo_video(),
+        real_time=False,
+        loop=False,
     )
 
 
@@ -92,8 +97,10 @@ def process(cap, max_frames: int, show: bool = False):
         total_edges += int(np.count_nonzero(edges))
         frames += 1
         if frames <= 3 or frames % 20 == 0:
-            print(f"  frame #{frame.count:04d}  source={frame.source}  "
-                  f"edge_px={int(np.count_nonzero(edges))}")
+            print(
+                f"  frame #{frame.count:04d}  source={frame.source}  "
+                f"edge_px={int(np.count_nonzero(edges))}"
+            )
         if show:
             try:
                 cv2.imshow("source_swap", edges)
@@ -112,8 +119,10 @@ def run(args) -> None:
     cap = make_source(args)
     if not cap.is_open():
         if args.source == "webcam":
-            print("Could not open the webcam (device "
-                  f"{args.device}). This source needs real camera hardware.")
+            print(
+                "Could not open the webcam (device "
+                f"{args.device}). This source needs real camera hardware."
+            )
         else:
             print("Failed to open the source.")
         return
@@ -131,11 +140,19 @@ def run(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=["webcam", "video", "folder"],
-                        default="video", help="frame source to run the SAME loop over")
+    parser.add_argument(
+        "--source",
+        choices=["webcam", "video", "folder"],
+        default="video",
+        help="frame source to run the SAME loop over",
+    )
     parser.add_argument("--frames", type=int, default=60, help="max frames to process")
-    parser.add_argument("--device", type=int, default=0, help="webcam device index (webcam source only)")
-    parser.add_argument("--show", action="store_true", help="display edges (off by default for headless use)")
+    parser.add_argument(
+        "--device", type=int, default=0, help="webcam device index (webcam source only)"
+    )
+    parser.add_argument(
+        "--show", action="store_true", help="display edges (off by default for headless use)"
+    )
     args = parser.parse_args()
     run(args)
 

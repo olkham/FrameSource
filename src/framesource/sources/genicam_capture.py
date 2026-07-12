@@ -1,12 +1,12 @@
 import logging
 import os
 import warnings
-from typing import Optional, Tuple, Any, Dict, List
+from typing import Any, Optional
 
 import numpy as np
 
-from .video_capture_base import VideoCaptureBase
 from ..errors import MissingDependencyError
+from .video_capture_base import VideoCaptureBase
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class GenicamCapture(VideoCaptureBase):
     supports_gain = True
 
     @classmethod
-    def get_config_schema(cls) -> Dict[str, Any]:
+    def get_config_schema(cls) -> dict[str, Any]:
         """Get configuration schema for GenICam capture"""
         warnings.warn(
             "get_config_schema() is deprecated and will be removed in a future release; "
@@ -26,106 +26,113 @@ class GenicamCapture(VideoCaptureBase):
             stacklevel=2,
         )
         return {
-            'title': 'GenICam Camera Configuration',
-            'description': 'Configure GenICam compliant camera settings',
-            'fields': [
+            "title": "GenICam Camera Configuration",
+            "description": "Configure GenICam compliant camera settings",
+            "fields": [
                 {
-                    'name': 'source',
-                    'label': 'Camera Source',
-                    'type': 'text',
-                    'placeholder': 'Serial number or device index (0, 1, 2...)',
-                    'description': 'Camera serial number or device index',
-                    'required': False,
-                    'default': '0'
+                    "name": "source",
+                    "label": "Camera Source",
+                    "type": "text",
+                    "placeholder": "Serial number or device index (0, 1, 2...)",
+                    "description": "Camera serial number or device index",
+                    "required": False,
+                    "default": "0",
                 },
                 {
-                    'name': 'cti_files',
-                    'label': 'CTI Files',
-                    'type': 'text',
-                    'placeholder': '/path/to/producer.cti',
-                    'description': 'GenTL producer files (comma-separated)',
-                    'required': False
+                    "name": "cti_files",
+                    "label": "CTI Files",
+                    "type": "text",
+                    "placeholder": "/path/to/producer.cti",
+                    "description": "GenTL producer files (comma-separated)",
+                    "required": False,
                 },
                 {
-                    'name': 'exposure',
-                    'label': 'Exposure Time (µs)',
-                    'type': 'number',
-                    'min': 1,
-                    'max': 1000000,
-                    'placeholder': '10000',
-                    'description': 'Exposure time in microseconds',
-                    'required': False
+                    "name": "exposure",
+                    "label": "Exposure Time (µs)",
+                    "type": "number",
+                    "min": 1,
+                    "max": 1000000,
+                    "placeholder": "10000",
+                    "description": "Exposure time in microseconds",
+                    "required": False,
                 },
                 {
-                    'name': 'gain',
-                    'label': 'Gain (dB)',
-                    'type': 'number',
-                    'min': 0,
-                    'max': 40,
-                    'step': 0.1,
-                    'placeholder': '0.0',
-                    'description': 'Camera gain in decibels',
-                    'required': False
+                    "name": "gain",
+                    "label": "Gain (dB)",
+                    "type": "number",
+                    "min": 0,
+                    "max": 40,
+                    "step": 0.1,
+                    "placeholder": "0.0",
+                    "description": "Camera gain in decibels",
+                    "required": False,
                 },
                 {
-                    'name': 'width',
-                    'label': 'Width',
-                    'type': 'number',
-                    'min': 1,
-                    'max': 10000,
-                    'placeholder': '1920',
-                    'description': 'Frame width in pixels',
-                    'required': False
+                    "name": "width",
+                    "label": "Width",
+                    "type": "number",
+                    "min": 1,
+                    "max": 10000,
+                    "placeholder": "1920",
+                    "description": "Frame width in pixels",
+                    "required": False,
                 },
                 {
-                    'name': 'height',
-                    'label': 'Height',
-                    'type': 'number',
-                    'min': 1,
-                    'max': 10000,
-                    'placeholder': '1080',
-                    'description': 'Frame height in pixels',
-                    'required': False
+                    "name": "height",
+                    "label": "Height",
+                    "type": "number",
+                    "min": 1,
+                    "max": 10000,
+                    "placeholder": "1080",
+                    "description": "Frame height in pixels",
+                    "required": False,
                 },
                 {
-                    'name': 'fps',
-                    'label': 'Frame Rate (FPS)',
-                    'type': 'number',
-                    'min': 1,
-                    'max': 240,
-                    'placeholder': '30',
-                    'description': 'Frames per second',
-                    'required': False,
-                    'default': 30
+                    "name": "fps",
+                    "label": "Frame Rate (FPS)",
+                    "type": "number",
+                    "min": 1,
+                    "max": 240,
+                    "placeholder": "30",
+                    "description": "Frames per second",
+                    "required": False,
+                    "default": 30,
                 },
                 {
-                    'name': 'x',
-                    'label': 'X Offset',
-                    'type': 'number',
-                    'min': 0,
-                    'placeholder': '0',
-                    'description': 'Horizontal offset in pixels',
-                    'required': False
+                    "name": "x",
+                    "label": "X Offset",
+                    "type": "number",
+                    "min": 0,
+                    "placeholder": "0",
+                    "description": "Horizontal offset in pixels",
+                    "required": False,
                 },
                 {
-                    'name': 'y',
-                    'label': 'Y Offset',
-                    'type': 'number',
-                    'min': 0,
-                    'placeholder': '0',
-                    'description': 'Vertical offset in pixels',
-                    'required': False
-                }
-            ]
+                    "name": "y",
+                    "label": "Y Offset",
+                    "type": "number",
+                    "min": 0,
+                    "placeholder": "0",
+                    "description": "Vertical offset in pixels",
+                    "required": False,
+                },
+            ],
         }
 
     @staticmethod
     def buffer_to_numpy(buffer):
-        from harvesters.util.pfnc import mono_location_formats, \
-            rgb_formats, bgr_formats, \
-            rgba_formats, bgra_formats, bayer_location_formats, lmn_422_location_formats, \
-            lmn_422_packed_location_formats, lmn_411_location_formats
         import cv2
+        from harvesters.util.pfnc import (
+            bayer_location_formats,
+            bgr_formats,
+            bgra_formats,
+            lmn_411_location_formats,
+            lmn_422_location_formats,
+            lmn_422_packed_location_formats,
+            mono_location_formats,
+            rgb_formats,
+            rgba_formats,
+        )
 
         payload = buffer.payload
         component = payload.components[0]
@@ -136,15 +143,15 @@ class GenicamCapture(VideoCaptureBase):
         if data_format in mono_location_formats:
             content = component.data.reshape(height, width)
         else:
-            if data_format in rgb_formats or \
-                    data_format in rgba_formats or \
-                    data_format in bgr_formats or \
-                    data_format in bgra_formats or \
-                    data_format in bayer_location_formats:
-
+            if (
+                data_format in rgb_formats
+                or data_format in rgba_formats
+                or data_format in bgr_formats
+                or data_format in bgra_formats
+                or data_format in bayer_location_formats
+            ):
                 content = component.data.reshape(
-                    height, width,
-                    int(component.num_components_per_pixel)
+                    height, width, int(component.num_components_per_pixel)
                 )
 
                 if data_format in bayer_location_formats:
@@ -152,10 +159,11 @@ class GenicamCapture(VideoCaptureBase):
 
                 if data_format in rgb_formats:
                     content = content[:, :, ::-1]
-            elif data_format in lmn_422_location_formats or \
-                    data_format in lmn_422_packed_location_formats or \
-                    data_format in lmn_411_location_formats:
-
+            elif (
+                data_format in lmn_422_location_formats
+                or data_format in lmn_422_packed_location_formats
+                or data_format in lmn_411_location_formats
+            ):
                 ycbcr422_data = component.data.reshape((-1, 4))
 
                 Y0 = ycbcr422_data[:, 0].astype(np.float32)
@@ -195,7 +203,7 @@ class GenicamCapture(VideoCaptureBase):
                 raise NotImplementedError(f"Unsupported pixel data format `{data_format}`")
         return content
 
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
         Read a single frame from the Genicam compliant camera.
         Returns:
@@ -225,14 +233,23 @@ class GenicamCapture(VideoCaptureBase):
             return False, None
 
     """Genicam camera capture using genicam."""
-    def __init__(self, source: Any = None, *, is_mono: Optional[bool] = None,
-                 cti_files: Optional[List[str]] = None,
-                 exposure: Optional[float] = None, gain: Optional[float] = None,
-                 width: Optional[int] = None, height: Optional[int] = None,
-                 x: Optional[int] = None, y: Optional[int] = None,
-                 fps: Optional[float] = None,
-                 acquisition_framerate: Optional[float] = None,
-                 **kwargs):
+
+    def __init__(
+        self,
+        source: Any = None,
+        *,
+        is_mono: Optional[bool] = None,
+        cti_files: Optional[list[str]] = None,
+        exposure: Optional[float] = None,
+        gain: Optional[float] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        fps: Optional[float] = None,
+        acquisition_framerate: Optional[float] = None,
+        **kwargs,
+    ):
         """Initialize the GenICam capture.
 
         Args:
@@ -271,11 +288,16 @@ class GenicamCapture(VideoCaptureBase):
         # explicitly-provided values so the ``'width' in self.config`` style
         # presence checks in connect() keep their old meaning.
         for _key, _val in (
-            ('is_mono', is_mono), ('cti_files', cti_files),
-            ('exposure', exposure), ('gain', gain),
-            ('width', width), ('height', height),
-            ('x', x), ('y', y), ('fps', fps),
-            ('acquisition_framerate', acquisition_framerate),
+            ("is_mono", is_mono),
+            ("cti_files", cti_files),
+            ("exposure", exposure),
+            ("gain", gain),
+            ("width", width),
+            ("height", height),
+            ("x", x),
+            ("y", y),
+            ("fps", fps),
+            ("acquisition_framerate", acquisition_framerate),
         ):
             if _val is not None:
                 kwargs[_key] = _val
@@ -284,11 +306,12 @@ class GenicamCapture(VideoCaptureBase):
         self.converter = None
         try:
             from harvesters.core import Harvester
+
             self.h = Harvester()
         except ImportError as e:
-            raise MissingDependencyError('harvesters', extra='genicam', details=str(e)) from e
+            raise MissingDependencyError("harvesters", extra="genicam", details=str(e)) from e
 
-        self.is_mono = self.config.get('is_mono', False)
+        self.is_mono = self.config.get("is_mono", False)
         self.serial_number = source if isinstance(source, str) else None
         self.device_index = source if isinstance(source, int) else 0
         self.fps = self.config.get("fps", 60)
@@ -310,7 +333,7 @@ class GenicamCapture(VideoCaptureBase):
         try:
             # self.h.add_file('/opt/pylon/lib/gentlproducer/gtl/ProducerU3V.cti')
 
-            cti_files = self.config.get("cti_files",[])
+            cti_files = self.config.get("cti_files", [])
             for cti_file in cti_files:
                 self.h.add_file(cti_file)
             for file in GenicamCapture.find_cti_paths():
@@ -326,7 +349,7 @@ class GenicamCapture(VideoCaptureBase):
 
             # Create camera object
             if self.serial_number:
-                self.camera = self.h.create({'serial_number': self.serial_number})
+                self.camera = self.h.create({"serial_number": self.serial_number})
             else:
                 self.camera = self.h.create(self.device_index)
 
@@ -347,22 +370,25 @@ class GenicamCapture(VideoCaptureBase):
             self.is_connected = True
 
             # Apply config parameters
-            if 'exposure' in self.config:
-                self.set_exposure(self.config['exposure'])
-            if 'gain' in self.config:
-                self.set_gain(self.config['gain'])
-            if 'width' in self.config and 'height' in self.config:
-                self.set_frame_size(self.config['width'], self.config['height'])
-            if 'x' in self.config or 'y' in self.config:
-                self.set_offset(self.config.get('x', 0), self.config.get('y', 0))
-            if 'fps' in self.config:
-                self.fps = self.config['fps']
-            if 'acquisition_framerate' in self.config:
-                self.set_fps(self.config['acquisition_framerate'])
+            if "exposure" in self.config:
+                self.set_exposure(self.config["exposure"])
+            if "gain" in self.config:
+                self.set_gain(self.config["gain"])
+            if "width" in self.config and "height" in self.config:
+                self.set_frame_size(self.config["width"], self.config["height"])
+            if "x" in self.config or "y" in self.config:
+                self.set_offset(self.config.get("x", 0), self.config.get("y", 0))
+            if "fps" in self.config:
+                self.fps = self.config["fps"]
+            if "acquisition_framerate" in self.config:
+                self.set_fps(self.config["acquisition_framerate"])
 
             self.camera.start()
 
-            logger.info(f"Connected to Genicam camera {self.camera.device.module.vendor} {self.camera.device.module.model}")
+            logger.info(
+                f"Connected to Genicam camera {self.camera.device.module.vendor} "
+                f"{self.camera.device.module.model}"
+            )
             return True
 
         except Exception as e:
@@ -380,7 +406,7 @@ class GenicamCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from Genicam camera: {e}")
             return False
 
-    def get_exposure_range(self) -> Tuple[float, float]:
+    def get_exposure_range(self) -> tuple[float, float]:
         """Get exposure range in microseconds."""
         if not self.is_connected or self.camera is None:
             return (0.0, 0.0)
@@ -395,7 +421,7 @@ class GenicamCapture(VideoCaptureBase):
             logger.error(f"Error getting exposure range: {e}")
             return (0.0, 0.0)
 
-    def get_gain_range(self) -> Tuple[float, float]:
+    def get_gain_range(self) -> tuple[float, float]:
         """Get gain range in dB."""
         if not self.is_connected or self.camera is None:
             return (0.0, 0.0)
@@ -511,7 +537,7 @@ class GenicamCapture(VideoCaptureBase):
             logger.error(f"Error setting Genicam camera offset: {e}")
             return False
 
-    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+    def get_frame_size(self) -> Optional[tuple[int, int]]:
         """Get frame size."""
         if not self.is_connected or self.camera is None:
             return None
@@ -566,69 +592,71 @@ class GenicamCapture(VideoCaptureBase):
     def discover(cls) -> list:
         """
         Discover available GenICam compliant cameras.
-        
+
         Returns:
             list: List of dictionaries containing GenICam camera information.
                 Each dict contains: {'index': int, 'serial_number': str, 'name': str, 'vendor': str}
         """
         devices = []
-        
+
         try:
             from harvesters.core import Harvester
         except ImportError:
             logger.warning("Harvesters module not available. Cannot discover GenICam cameras.")
             return []
-        
+
         harvester = None
         try:
             harvester = Harvester()
-            
+
             # Add common GenTL producer paths (this may need customization)
             try:
                 for file in GenicamCapture.find_cti_paths():
                     harvester.add_file(file)
 
                 # Try to add some common GenTL producers
-                harvester.add_file('/opt/pylon5/lib64/pylon_TL_GenICam.cti')  # Basler
-                harvester.add_file('/opt/mvIMPACT_acquire/lib/x86_64/mvGenTLProducer.cti')  # MATRIX VISION
-            except:
+                harvester.add_file("/opt/pylon5/lib64/pylon_TL_GenICam.cti")  # Basler
+                harvester.add_file(
+                    "/opt/mvIMPACT_acquire/lib/x86_64/mvGenTLProducer.cti"
+                )  # MATRIX VISION
+            except Exception:
                 pass  # If paths don't exist, that's fine
-            
+
             harvester.update()
-            
+
             for i, device_info in enumerate(harvester.device_info_list):
                 try:
-                    serial = getattr(device_info, 'serial_number', f'genicam_{i}')
+                    serial = getattr(device_info, "serial_number", f"genicam_{i}")
                     device_data = {
-                        'index': i,
-                        'id': i,
-                        'serial_number': serial,
-                        'name': "Genicam " + getattr(device_info, 'model', 'GenICam Camera'),
-                        'vendor': getattr(device_info, 'vendor', 'Unknown')
+                        "index": i,
+                        "id": i,
+                        "serial_number": serial,
+                        "name": "Genicam " + getattr(device_info, "model", "GenICam Camera"),
+                        "vendor": getattr(device_info, "vendor", "Unknown"),
                     }
                     devices.append(device_data)
                     logger.info(f"Found GenICam camera: {device_data}")
-                    
+
                 except Exception as e:
                     logger.warning(f"Could not get info for GenICam device {i}: {e}")
                     continue
-            
+
         except Exception as e:
             logger.error(f"Error discovering GenICam cameras: {e}")
         finally:
             if harvester:
                 try:
                     harvester.reset()
-                except:
+                except Exception:
                     pass
-        
+
         return devices
 
 
 if __name__ == "__main__":
     # Example usage
     import cv2
-    
+
     devices = GenicamCapture.discover()
     print("Discovered GenICam cameras:")
     for device in devices:
@@ -646,7 +674,7 @@ if __name__ == "__main__":
             ret, frame = camera.read()
             if ret and frame is not None:
                 cv2.imshow("Webcam", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
         camera.disconnect()
     else:

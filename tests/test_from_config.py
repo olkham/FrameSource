@@ -4,11 +4,10 @@ import builtins
 import json
 
 import pytest
+from conftest import MockCapture
 
 from framesource import FrameSourceFactory
 from framesource.errors import MissingDependencyError, UnknownSourceTypeError
-
-from conftest import MockCapture
 
 MOCK_TYPE = "mock"
 
@@ -122,6 +121,4 @@ def test_from_config_missing_file_raises_file_not_found(tmp_path):
 
 def test_from_config_unknown_source_type_raises():
     with pytest.raises(UnknownSourceTypeError):
-        FrameSourceFactory.from_config(
-            {"source_type": "definitely_not_registered", "source_id": 0}
-        )
+        FrameSourceFactory.from_config({"source_type": "definitely_not_registered", "source_id": 0})

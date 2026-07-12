@@ -14,7 +14,7 @@ kept flat via :attr:`DeviceInfo.metadata` so ``dev['id']``, ``dev['name']``,
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -41,27 +41,27 @@ class DeviceInfo:
 
     device_id: str
     index: Optional[int] = None
-    name: str = ''
-    driver: str = ''
+    name: str = ""
+    driver: str = ""
     id_stable: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def _flat(self) -> Dict[str, Any]:
+    def _flat(self) -> dict[str, Any]:
         """Return the flat, dict-compatible view (``'id'`` alias + metadata)."""
-        flat: Dict[str, Any] = {
-            'id': self.device_id,
-            'index': self.index,
-            'name': self.name,
-            'driver': self.driver,
-            'id_stable': self.id_stable,
+        flat: dict[str, Any] = {
+            "id": self.device_id,
+            "index": self.index,
+            "name": self.name,
+            "driver": self.driver,
+            "id_stable": self.id_stable,
         }
         flat.update(self.metadata)
         return flat
 
     def __getitem__(self, key: str) -> Any:
-        if key in ('id', 'device_id'):
+        if key in ("id", "device_id"):
             return self.device_id
-        if key in ('index', 'name', 'driver', 'id_stable'):
+        if key in ("index", "name", "driver", "id_stable"):
             return getattr(self, key)
         if key in self.metadata:
             return self.metadata[key]
@@ -75,7 +75,7 @@ class DeviceInfo:
             return default
 
     def __contains__(self, key: str) -> bool:
-        if key in ('id', 'device_id', 'index', 'name', 'driver', 'id_stable'):
+        if key in ("id", "device_id", "index", "name", "driver", "id_stable"):
             return True
         return key in self.metadata
 
@@ -91,7 +91,7 @@ class DeviceInfo:
         """Return the flat ``(key, value)`` pairs."""
         return self._flat().items()
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return a faithful dict of the dataclass fields.
 
         Unlike the flat dict-compat view, this uses the canonical
@@ -100,10 +100,10 @@ class DeviceInfo:
         equivalent instance.
         """
         return {
-            'device_id': self.device_id,
-            'index': self.index,
-            'name': self.name,
-            'driver': self.driver,
-            'id_stable': self.id_stable,
-            'metadata': dict(self.metadata),
+            "device_id": self.device_id,
+            "index": self.index,
+            "name": self.name,
+            "driver": self.driver,
+            "id_stable": self.id_stable,
+            "metadata": dict(self.metadata),
         }

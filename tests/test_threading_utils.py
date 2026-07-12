@@ -9,15 +9,15 @@ import queue
 import threading
 import time
 
+from conftest import MockCapture
+
+from framesource.sources.video_capture_base import FrameSourceProtocol
 from framesource.threading_utils import (
     AsyncFrameSource,
-    SharedProducer,
     ProducerConsumer,
+    SharedProducer,
     create_producer_consumer_pair,
 )
-from framesource.sources.video_capture_base import FrameSourceProtocol
-
-from conftest import MockCapture
 
 
 def test_async_frame_source_context_manager_reads_frames():
@@ -114,10 +114,9 @@ def test_shared_producer_stats_keys_present():
     camera.disconnect()
 
     stats = shared.get_stats()
-    for key in ('frames_captured', 'frames_dropped', 'drops_per_subscriber',
-                'runtime', 'fps'):
+    for key in ("frames_captured", "frames_dropped", "drops_per_subscriber", "runtime", "fps"):
         assert key in stats
-    assert stats['frames_captured'] >= 1
+    assert stats["frames_captured"] >= 1
 
 
 def test_shared_producer_stop_joins_cleanly():
@@ -134,10 +133,12 @@ def test_shared_producer_stop_joins_cleanly():
 
 def _collect_consumer(received: list, lock: threading.Lock):
     """Return a consumer callback that records successful frames thread-safely."""
+
     def consume(success, frame):
         if success and frame is not None:
             with lock:
                 received.append(frame)
+
     return consume
 
 
