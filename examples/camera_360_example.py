@@ -77,10 +77,10 @@ def main():
             if event == cv2.EVENT_LBUTTONDOWN:
                 print(f"Clicked at pixel ({x}, {y}) -> Set angles: yaw={yaw:.1f}°, pitch={pitch:.1f}°, roll={roll:.1f}°")
     
-    # Create webcam capture for 360 camera (adjust source as needed)
-    camera = FrameSourceFactory.create('webcam', source=1)
-    
-    if not camera.connect():
+    # Create webcam capture for 360 camera (adjust source as needed); auto-connects.
+    camera = FrameSourceFactory.create('webcam', source_id=1)
+
+    if not camera.is_connected:
         print("Failed to connect to 360 camera")
         return
     

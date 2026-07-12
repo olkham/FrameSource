@@ -15,9 +15,9 @@ def main():
     cv2.namedWindow("Webcam", cv2.WINDOW_NORMAL)
     print("Testing Webcam Capture:")
     
-    # Create webcam capture
-    camera = FrameSourceFactory.create('webcam', source=0)
-       
+    # Create webcam capture (auto-connects)
+    camera = FrameSourceFactory.create('webcam', source_id=0)
+
     # Configure camera settings
     camera.set_frame_size(1920, 1080)  # Full HD
     camera.set_fps(30)

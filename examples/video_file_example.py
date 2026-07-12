@@ -16,9 +16,9 @@ def main():
     
     # Create video file capture (update path as needed)
     video_path = "../media/geti_demo.mp4"  # Adjust path relative to examples folder
-    camera = FrameSourceFactory.create('video_file', source=video_path, loop=True)
-    
-    if not camera.connect():
+    camera = FrameSourceFactory.create('video_file', source_id=video_path, loop=True)  # auto-connects
+
+    if not camera.is_connected:
         print(f"Failed to connect to video file: {video_path}")
         return
     

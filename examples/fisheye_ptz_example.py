@@ -77,11 +77,11 @@ def main():
             if event == cv2.EVENT_LBUTTONDOWN:
                 print(f"Look at: yaw={yaw:.1f}°, pitch={pitch:.1f}°")
 
-    # Try to connect to a fisheye camera (webcam source 0)
+    # Try to connect to a fisheye camera (webcam source 0); auto-connects.
     # For testing, you can also use a fisheye image/video file
-    camera = FrameSourceFactory.create('webcam', source=0)
+    camera = FrameSourceFactory.create('webcam', source_id=0)
 
-    if not camera.connect():
+    if not camera.is_connected:
         print("No camera found. Creating a synthetic fisheye test pattern...")
         camera = None
 

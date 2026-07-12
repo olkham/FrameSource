@@ -29,12 +29,12 @@ def main():
         'percentile_range': (5, 95)
     }
     
-    frame_source = FrameSourceFactory.create('audio_spectrogram', source=None, **audio_params)
-    
-    if not frame_source.connect():
+    frame_source = FrameSourceFactory.create('audio_spectrogram', source_id=None, **audio_params)
+
+    if not frame_source.is_connected:
         print("Failed to connect to audio source")
         return
-    
+
     if frame_source.is_connected:
         print(f"Audio spectrogram parameters:")
         print(f"  Frame size: {frame_source.get_frame_size()}")

@@ -18,15 +18,15 @@ def main():
     # Create folder capture (update path as needed)
     folder_path = "../media/image_seq"  # Adjust path relative to examples folder
     camera = FrameSourceFactory.create(
-        'folder', 
-        source=folder_path, 
+        'folder',
+        source_id=folder_path,
         sort_by='name',  # or 'date'
-        fps=30, 
-        real_time=True, 
+        fps=30,
+        real_time=True,
         loop=True
-    )
-    
-    if not camera.connect():
+    )  # auto-connects
+
+    if not camera.is_connected:
         print(f"Failed to connect to image folder: {folder_path}")
         return
     

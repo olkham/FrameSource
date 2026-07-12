@@ -22,13 +22,13 @@ def main():
     camera_url = "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg"
     
     camera = FrameSourceFactory.create(
-        'ipcam', 
-        source=camera_url,
+        'ipcam',
+        source_id=camera_url,
         # username="admin",      # Uncomment if authentication needed
         # password="password",   # Uncomment if authentication needed
-    )
-    
-    if not camera.connect():
+    )  # auto-connects
+
+    if not camera.is_connected:
         print(f"Failed to connect to IP camera: {camera_url}")
         print("Make sure the URL is correct and the camera is accessible")
         return
