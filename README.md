@@ -287,6 +287,31 @@ The config shape mirrors `create()`'s parameters: `source_type` and `source_id` 
 directly, and any other keys (e.g. `fps`, `loop`, `connect`) are forwarded as keyword
 arguments.
 
+#### Webcam frame rate at high resolution (MJPG / backend)
+
+If a USB webcam requests 1080p (or higher) at 30 fps but only delivers a handful of frames
+per second, the cause is almost always the **pixel format**: the camera is streaming an
+**uncompressed** format (e.g. YUY2) that saturates the USB link, where the Windows Camera app
+would request compressed **MJPG**. Two knobs fix this:
+
+```python
+cap = FrameSourceFactory.create(
+    'webcam', source_id=0,
+    width=1920, height=1080, fps=30,
+    fourcc='MJPG',      # request a compressed format (applied before the resolution)
+    backend='msmf',     # on Windows, MSMF negotiates MJPG where DirectShow often won't
+)
+```
+
+- **`fourcc`** — four-character pixel format, e.g. `'MJPG'`. Applied before the resolution so
+  the driver doesn't reset it.
+- **`backend`** — `'msmf'`, `'dshow'`, `'v4l2'`, `'avfoundation'`, `'gstreamer'`, `'ffmpeg'`,
+  `'any'`, or a raw `cv2.CAP_*` int. Defaults to the OS default (DirectShow on Windows). Note
+  that DirectShow and MSMF interpret `set_exposure()`/`set_gain()` values differently.
+
+`connect()` logs a warning if it detects an uncompressed format negotiated at 720p or above, so
+this failure mode is visible rather than silent.
+
 ### 3. Direct Use
 
 #### Intel RealSense Camera

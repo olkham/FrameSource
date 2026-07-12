@@ -1,7 +1,7 @@
 import logging
 import platform
 import warnings
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import cv2
 import numpy as np
@@ -10,6 +10,33 @@ from ..discovery import DeviceInfo
 from .video_capture_base import VideoCaptureBase
 
 logger = logging.getLogger(__name__)
+
+# String aliases for OpenCV capture backends, resolved to the cv2.CAP_* ints.
+# Only backends present in this OpenCV build are included.
+_BACKEND_ALIASES: dict[str, int] = {}
+for _alias, _const_name in (
+    ("any", "CAP_ANY"),
+    ("auto", "CAP_ANY"),
+    ("dshow", "CAP_DSHOW"),
+    ("msmf", "CAP_MSMF"),
+    ("v4l2", "CAP_V4L2"),
+    ("avfoundation", "CAP_AVFOUNDATION"),
+    ("gstreamer", "CAP_GSTREAMER"),
+    ("ffmpeg", "CAP_FFMPEG"),
+):
+    if hasattr(cv2, _const_name):
+        _BACKEND_ALIASES[_alias] = getattr(cv2, _const_name)
+
+# Uncompressed pixel formats. When one of these is negotiated at high
+# resolution the USB link is easily saturated, throttling the frame rate far
+# below what MJPG (compressed) would sustain.
+_UNCOMPRESSED_FOURCCS = frozenset(
+    {"YUY2", "YUYV", "UYVY", "I420", "IYUV", "YV12", "NV12", "RGB3", "BGR3"}
+)
+
+# Resolutions at or above this pixel count are where uncompressed transport
+# starts to hurt (720p and up).
+_HIGH_RES_PIXELS = 1280 * 720
 
 
 class WebcamCapture(VideoCaptureBase):
@@ -26,6 +53,8 @@ class WebcamCapture(VideoCaptureBase):
         width: Optional[int] = None,
         height: Optional[int] = None,
         fps: Optional[float] = None,
+        backend: Optional[Union[str, int]] = None,
+        fourcc: Optional[str] = None,
         **kwargs,
     ):
         """Initialize the webcam capture.
@@ -40,6 +69,23 @@ class WebcamCapture(VideoCaptureBase):
                 :meth:`connect` (together with ``width``) when provided.
             fps: Desired frames per second. Applied on :meth:`connect` when
                 provided.
+            backend: OpenCV capture backend to open the device with. Accepts a
+                name (``'msmf'``, ``'dshow'``, ``'v4l2'``, ``'avfoundation'``,
+                ``'gstreamer'``, ``'ffmpeg'``, ``'any'``) or a raw
+                ``cv2.CAP_*`` integer. ``None`` (default) uses the OS default
+                (DirectShow on Windows, AVFoundation on macOS, V4L2 on Linux).
+                Note that on Windows ``'dshow'`` and ``'msmf'`` interpret the
+                exposure/gain values in :meth:`set_exposure`/:meth:`set_gain`
+                differently. If a high-resolution stream is stuck at a low
+                frame rate, ``'msmf'`` will often negotiate a compressed format
+                where DirectShow will not.
+            fourcc: Desired pixel format as a four-character code, e.g.
+                ``'MJPG'``. Applied on :meth:`connect` *before* the resolution
+                so it is not reset by the resolution change. ``None`` (default)
+                leaves the backend's default format untouched. Requesting
+                ``'MJPG'`` is the usual fix for uncompressed formats saturating
+                the USB link at 1080p and above (see the warning logged by
+                :meth:`connect`). Not all backends honour every code.
             **kwargs: Additional passthrough options stored on ``self.config``.
         """
         # Preserve the historical ``self.config`` contents: these options were
@@ -51,13 +97,8 @@ class WebcamCapture(VideoCaptureBase):
                 kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.cap = None
-        # Set API preference based on OS
-        if platform.system() == "Windows":
-            self.api_preference = cv2.CAP_DSHOW  # DirectShow for Windows
-        elif platform.system() == "Darwin":
-            self.api_preference = cv2.CAP_AVFOUNDATION  # AVFoundation for macOS
-        else:
-            self.api_preference = cv2.CAP_V4L2  # Video4Linux for Linux
+        self.fourcc = fourcc
+        self.api_preference = self._resolve_backend(backend)
 
         self.source = source
 
@@ -66,6 +107,31 @@ class WebcamCapture(VideoCaptureBase):
                 "'is_mono' argument is only used for certain industrial cameras "
                 "and has no effect for webcams."
             )
+
+    @staticmethod
+    def _resolve_backend(backend: Optional[Union[str, int]]) -> int:
+        """Resolve a backend name/int to a cv2.CAP_* constant.
+
+        ``None`` maps to the OS default; an int is used verbatim; a string is
+        looked up (case-insensitively) in :data:`_BACKEND_ALIASES`.
+        """
+        if backend is None:
+            if platform.system() == "Windows":
+                return cv2.CAP_DSHOW
+            elif platform.system() == "Darwin":
+                return cv2.CAP_AVFOUNDATION
+            else:
+                return cv2.CAP_V4L2
+        if isinstance(backend, int):
+            return backend
+        key = backend.strip().lower()
+        if key not in _BACKEND_ALIASES:
+            available = ", ".join(sorted(_BACKEND_ALIASES))
+            raise ValueError(
+                f"Unknown webcam backend {backend!r}. Use one of: {available}, "
+                f"or pass a cv2.CAP_* integer."
+            )
+        return _BACKEND_ALIASES[key]
 
     def connect(self) -> bool:
         """Connect to webcam."""
@@ -89,6 +155,12 @@ class WebcamCapture(VideoCaptureBase):
                 logger.error(f"Failed to open webcam {src}")
                 return False
 
+            # Pixel format must be set before the resolution: several drivers
+            # reset the format back to their default when the frame size
+            # changes.
+            if self.fourcc:
+                self._apply_fourcc(self.fourcc)
+
             # Set additional parameters if provided
             if "width" in self.config and "height" in self.config:
                 self.set_frame_size(self.config["width"], self.config["height"])
@@ -96,6 +168,7 @@ class WebcamCapture(VideoCaptureBase):
                 self.cap.set(cv2.CAP_PROP_FPS, self.config["fps"])
 
             self.is_connected = True
+            self._warn_if_bandwidth_limited()
             logger.info(f"Connected to webcam {src}")
             return True
         except Exception as e:
@@ -189,6 +262,63 @@ class WebcamCapture(VideoCaptureBase):
         result2 = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         logger.info(f"Set webcam resolution to {width}x{height} (success: {result1 and result2})")
         return result1 and result2
+
+    def _apply_fourcc(self, fourcc: str) -> bool:
+        """Request a pixel format from the device by its four-character code.
+
+        Returns True if OpenCV accepted the request. Note that acceptance does
+        not guarantee the driver actually switches format (see
+        :meth:`get_fourcc` / :meth:`_warn_if_bandwidth_limited`).
+        """
+        if self.cap is None:
+            return False
+        if len(fourcc) != 4:
+            logger.warning("Ignoring invalid fourcc %r (must be 4 characters, e.g. 'MJPG')", fourcc)
+            return False
+        # VideoWriter_fourcc moved to VideoWriter.fourcc in newer OpenCV builds.
+        fourcc_fn = getattr(cv2, "VideoWriter_fourcc", None) or cv2.VideoWriter.fourcc
+        code = fourcc_fn(*fourcc)
+        ok = bool(self.cap.set(cv2.CAP_PROP_FOURCC, code))
+        logger.info("Requested pixel format %s (accepted: %s)", fourcc, ok)
+        return ok
+
+    def get_fourcc(self) -> Optional[str]:
+        """Return the currently negotiated pixel format as a 4-char code.
+
+        Returns None if not connected. Some backends (notably MSMF) report an
+        empty string even while delivering a compressed stream.
+        """
+        if not self.is_connected or self.cap is None:
+            return None
+        value = int(self.cap.get(cv2.CAP_PROP_FOURCC))
+        return "".join(chr((value >> (8 * i)) & 0xFF) for i in range(4)).strip("\x00 ")
+
+    def _warn_if_bandwidth_limited(self) -> None:
+        """Log a warning when a high-res stream negotiated an uncompressed format.
+
+        This is the common cause of a webcam that requests 1080p30 but only
+        delivers a handful of frames per second: an uncompressed format (e.g.
+        YUY2) saturates the USB link. Requesting ``fourcc='MJPG'`` or a
+        different ``backend`` usually resolves it.
+        """
+        size = self.get_frame_size()
+        if not size:
+            return
+        width, height = size
+        if width * height < _HIGH_RES_PIXELS:
+            return
+        negotiated = self.get_fourcc()
+        # MSMF reports an empty code even on a fast compressed stream, so only
+        # warn when we positively identify an uncompressed format.
+        if negotiated and negotiated.upper() in _UNCOMPRESSED_FOURCCS:
+            logger.warning(
+                "Webcam negotiated uncompressed %s at %dx%d; USB bandwidth may cap the "
+                "frame rate well below the requested value. Pass fourcc='MJPG', or try a "
+                "different backend (e.g. backend='msmf' on Windows).",
+                negotiated,
+                width,
+                height,
+            )
 
     def get_fps(self) -> Optional[float]:
         """Get FPS."""

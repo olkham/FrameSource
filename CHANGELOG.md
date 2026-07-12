@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `WebcamCapture` gains `backend` and `fourcc` constructor keyword arguments.
+  `backend` selects the OpenCV capture backend by name (`'msmf'`, `'dshow'`,
+  `'v4l2'`, `'avfoundation'`, `'gstreamer'`, `'ffmpeg'`, `'any'`) or a raw
+  `cv2.CAP_*` int; `fourcc` (e.g. `'MJPG'`) requests a pixel format, applied
+  before the resolution so drivers don't reset it. Fixes uncompressed formats
+  (e.g. YUY2) saturating the USB link and throttling high-resolution capture
+  to single-digit frame rates. `connect()` now logs a warning when it detects
+  an uncompressed format negotiated at 720p or above, and `get_fourcc()`
+  reports the negotiated format.
+
 ## [0.3.0] - 2026-07-12
 
 The "synchronous core" release. The package was renamed, the internal

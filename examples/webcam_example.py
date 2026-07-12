@@ -16,12 +16,24 @@ def main():
     cv2.namedWindow("Webcam", cv2.WINDOW_NORMAL)
     print("Testing Webcam Capture:")
 
-    # Create webcam capture (auto-connects)
-    camera = FrameSourceFactory.create("webcam", source_id=0)
-
-    # Configure camera settings
-    camera.set_frame_size(1920, 1080)  # Full HD
-    camera.set_fps(30)
+    # Create webcam capture (auto-connects). Resolution, fps, backend and
+    # pixel format are passed here so connect() applies the pixel format
+    # before the resolution (some drivers reset the format otherwise).
+    #
+    # At 1080p+, an uncompressed format (e.g. YUY2) can saturate the USB link
+    # and throttle the frame rate to single digits. Requesting fourcc='MJPG'
+    # avoids that; on Windows, backend='msmf' negotiates a compressed stream
+    # where DirectShow ('dshow', the default) sometimes will not. If the frame
+    # rate is still low, connect() logs a warning naming the negotiated format.
+    camera = FrameSourceFactory.create(
+        "webcam",
+        source_id=0,  # Change source_id if you have multiple cameras
+        width=1920,
+        height=1080,
+        fps=30,
+        backend="msmf",  # or 'dshow' / 'v4l2' / 'avfoundation' / a cv2.CAP_* int
+        fourcc="MJPG",
+    )
 
     if camera.isOpened():
         # Get exposure and gain ranges
