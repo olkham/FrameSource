@@ -28,11 +28,11 @@ import argparse
 import time
 from pathlib import Path
 
-import cv2
 import numpy as np
 
 from framesource import FrameSourceFactory
 from framesource.threading_utils import FrameProducer
+import cv2
 
 MEDIA_DIR = Path(__file__).resolve().parents[1] / "media"
 

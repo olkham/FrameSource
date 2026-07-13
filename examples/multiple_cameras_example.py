@@ -19,16 +19,16 @@ def main():
 
     # Configuration for different camera types
     # Uncomment/modify the cameras you want to test
+    # Configuration for different camera types
     cameras_config: list[dict[str, Any]] = [
-        {"capture_type": "webcam", "source": 0},
-        # {'capture_type': 'basler', 'threaded': True},
-        # {'capture_type': 'ximea', 'threaded': True},
-        # {'capture_type': 'ipcam', 'source': "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg", 'threaded': True},  # noqa: E501
-        # {'capture_type': 'video_file', 'source': "media/geti_demo.mp4", 'loop': True, 'threaded': True},  # noqa: E501
-        # {'capture_type': 'folder', 'source': "media/image_seq", 'sort_by': 'name', 'fps': 10, 'real_time': True, 'loop': True, 'threaded': True},  # noqa: E501
-        # {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 400, 'h': 300, 'fps': 15, 'threaded': True},  # noqa: E501
-        # {'capture_type': 'realsense', 'width': 1280, 'height': 720, 'threaded': False},
-        # {'capture_type': 'genicam', 'source': 'FNCF000001', 'threaded': True},
+        {"capture_type": "webcam", "source": 2, "width": 1920, "height": 1080, "fps": 60, "backend": "msmf", "fourcc": "MJPG"},
+        # {'capture_type': 'basler'},
+        # {'capture_type': 'basler'},
+        {'capture_type': 'ipcam', 'source': "https://195.196.36.242/mjpg/video.mjpg"},
+        # {'capture_type': 'video_file', 'source': "media/geti_demo.mp4", 'loop': True},
+        # {'capture_type': 'folder', 'source': "media/image_seq", 'sort_by': 'name', 'fps': 10, 'real_time': True, 'loop': True},  # noqa: E501
+        # {'capture_type': 'screen', 'x': 100, 'y': 100, 'w': 400, 'h': 300, 'fps': 15},
+        # {'capture_type': 'realsense', 'width': 1280, 'height': 720},
     ]
 
     capture_instances = []

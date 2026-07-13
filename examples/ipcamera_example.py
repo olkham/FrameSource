@@ -5,9 +5,9 @@ IP Camera Capture Example
 Demonstrates IP camera capture using RTSP or HTTP streams.
 """
 
-import cv2
 
 from framesource import FrameSourceFactory
+import cv2
 
 
 def main():

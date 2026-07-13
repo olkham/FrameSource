@@ -6,10 +6,10 @@ Demonstrates 360° camera capture with equirectangular to pinhole projection.
 Includes interactive controls for adjusting the virtual camera view.
 """
 
-import cv2
 
 from framesource import FrameSourceFactory
 from framesource.processors.equirectangular360_processor import Equirectangular2PinholeProcessor
+import cv2
 
 
 def main():

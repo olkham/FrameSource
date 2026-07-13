@@ -25,10 +25,10 @@ import threading
 import time
 from typing import Any
 
-import cv2
 
 from framesource import FrameSourceFactory
 from framesource.threading_utils import simple_frame_producer
+import cv2
 
 
 def main():

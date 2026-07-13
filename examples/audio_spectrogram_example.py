@@ -6,9 +6,9 @@ Demonstrates audio spectrogram capture from microphone or audio file with advanc
 contrast controls, colormap options, and real-time parameter adjustment.
 """
 
-import cv2
 
 from framesource import FrameSourceFactory
+import cv2
 
 
 def main():

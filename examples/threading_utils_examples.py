@@ -17,7 +17,7 @@ def example_1_simple_producer():
     """Example 1: Using the simple_frame_producer function directly."""
     print("=== Example 1: Direct use of simple_frame_producer ===")
 
-    camera = WebcamCapture(source=0)
+    camera = WebcamCapture(source=2)
     frame_queue = queue.Queue(maxsize=5)
     stop_event = threading.Event()
 
@@ -51,7 +51,7 @@ def example_2_frame_producer_class():
     """Example 2: Using the FrameProducer class."""
     print("\n=== Example 2: Using FrameProducer class ===")
 
-    camera = WebcamCapture(source=0)
+    camera = WebcamCapture(source=2)
     producer = FrameProducer(camera, max_queue_size=10, target_fps=None)
     producer.start()
 
@@ -73,7 +73,7 @@ def example_3_multiple_consumers():
     """Example 3: One producer, multiple consumers."""
     print("\n=== Example 3: Multiple consumers ===")
 
-    camera = WebcamCapture(source=0)
+    camera = WebcamCapture(source=2)
     frame_queue = queue.Queue(maxsize=5)
     stop_event = threading.Event()
 

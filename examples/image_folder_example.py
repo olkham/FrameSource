@@ -6,9 +6,8 @@ Demonstrates capturing frames from a folder of images with sorting options
 and real-time playback controls.
 """
 
-import cv2
-
 from framesource import FrameSourceFactory
+import cv2
 
 
 def main():

@@ -6,9 +6,8 @@ Demonstrates usage of various industrial cameras (Basler, GenICam, etc.)
 with exposure and gain controls.
 """
 
-import cv2
-
 from framesource import FrameSourceFactory
+import cv2
 
 
 def test_basler_camera():

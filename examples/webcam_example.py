@@ -8,6 +8,7 @@ Supports threaded capture for smooth frame acquisition.
 
 
 from framesource import FrameSourceFactory
+from framesource import Frame
 import cv2
 
 
@@ -30,10 +31,12 @@ def main():
         source_id=2,  # Change source_id if you have multiple cameras
         width=1920,
         height=1080,
-        fps=30,
+        fps=60,
         backend="msmf",  # or 'dshow' / 'v4l2' / 'avfoundation' / a cv2.CAP_* int
         fourcc="MJPG",
     )
+    
+    frame: Frame = None   # Create a reusable frame object for threaded capture
 
     if camera.isOpened():
         # Get exposure and gain ranges

@@ -9,15 +9,13 @@ pinhole camera view using the processor chain:
 This enables pan/tilt/zoom control over a fisheye camera feed.
 """
 
-import cv2
-import numpy as np
-
 from framesource import FrameSourceFactory
 from framesource.processors import (
     Equirectangular2PinholeProcessor,
     Fisheye2EquirectangularProcessor,
 )
-
+import cv2
+import numpy as np
 
 def main():
     """Test fisheye to pinhole projection with PTZ controls."""
