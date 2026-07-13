@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an uncompressed format negotiated at 720p or above, and `get_fourcc()`
   reports the negotiated format.
 
+### Fixed
+
+- Importing `framesource` now disables OpenCV MSMF hardware transforms on
+  Windows (`OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS=0`, via `setdefault` so
+  an explicit user value wins). This cuts webcam open time on affected devices
+  from 20+ seconds to a fraction of a second with no throughput cost. Only
+  effective when `framesource` is imported before `cv2` opens an MSMF device.
+
 ## [0.3.0] - 2026-07-12
 
 The "synchronous core" release. The package was renamed, the internal

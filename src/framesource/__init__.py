@@ -1,6 +1,10 @@
 import importlib
 import logging
 
+# Must be imported before any capture module pulls in cv2 (it configures the
+# OpenCV MSMF backend, which reads its env var at cv2-import time). The `_`
+# prefix sorts it first within this first-party import group.
+from . import _msmf_config as _msmf_config  # noqa: F401
 from .discovery import DeviceInfo
 from .errors import (
     FrameSourceError,

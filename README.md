@@ -312,6 +312,14 @@ cap = FrameSourceFactory.create(
 `connect()` logs a warning if it detects an uncompressed format negotiated at 720p or above, so
 this failure mode is visible rather than silent.
 
+> **Windows / MSMF slow open:** OpenCV's MSMF backend can take 20+ seconds to *open* some
+> webcams because it initializes hardware Media Foundation transforms. FrameSource disables
+> those transforms (`OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS=0`) when you `import framesource`,
+> which drops the open time to a fraction of a second with no throughput cost. This only takes
+> effect if `framesource` is imported before `cv2` opens an MSMF device; set the environment
+> variable yourself (to `0`) if your app imports and uses `cv2` first, or to `1` to opt back
+> into the default OpenCV behaviour.
+
 ### 3. Direct Use
 
 #### Intel RealSense Camera
