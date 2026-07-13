@@ -6,9 +6,9 @@ Demonstrates basic webcam capture with manual controls for exposure, gain, and a
 Supports threaded capture for smooth frame acquisition.
 """
 
-import cv2
 
 from framesource import FrameSourceFactory
+import cv2
 
 
 def main():
@@ -27,7 +27,7 @@ def main():
     # rate is still low, connect() logs a warning naming the negotiated format.
     camera = FrameSourceFactory.create(
         "webcam",
-        source_id=0,  # Change source_id if you have multiple cameras
+        source_id=2,  # Change source_id if you have multiple cameras
         width=1920,
         height=1080,
         fps=30,
