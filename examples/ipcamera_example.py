@@ -20,7 +20,7 @@ def main():
     # http_url = "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg"
 
     # Use a public demo camera for testing
-    camera_url = "http://pendelcam.kip.uni-heidelberg.de/mjpg/video.mjpg"
+    camera_url = "https://195.196.36.242/mjpg/video.mjpg"
 
     camera = FrameSourceFactory.create(
         "ipcam",
