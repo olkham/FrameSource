@@ -1,71 +1,29 @@
-from typing import Optional, Tuple, Any, Dict
-import numpy as np
-import cv2
 import logging
-import platform
+import warnings
+from typing import Any, Optional
 
+import cv2
+import numpy as np
+
+from ..errors import MissingDependencyError
+from ..processors.realsense_depth_processor import (
+    RealsenseDepthProcessor,
+    RealsenseProcessingOutput,
+)
 from .video_capture_base import VideoCaptureBase
-from ..processors.realsense_depth_processor import RealsenseDepthProcessor, RealsenseProcessingOutput
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class RealsenseCapture(VideoCaptureBase):
     has_discovery = True
-    display_fields = [
-        {'key': 'name', 'label': 'Name'},
-        {'key': 'serial_number', 'label': 'Serial Number'},
-        {'key': 'product_line', 'label': 'Product Line'},
-        {'key': 'index', 'label': 'Index'}
-    ]
-    
-    def start_async(self):
-        """
-        Start background thread to continuously capture frames from realsense camera.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
-        self._capture_thread.start()
+    supports_exposure = True
+    supports_gain = True
+    supports_depth = True
 
-    def stop(self):
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event is not None:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
-            self._capture_thread.join(timeout=2)
-        self._capture_thread = None
-        self._stop_event = None
-
-    def _background_capture(self):
-        import time
-        while not self._stop_event.is_set():  # type: ignore
-            success, frame = self._read_direct()
-            if success:
-                self._latest_frame = frame
-            time.sleep(0.01)  # ~100 FPS max, adjust as needed
-
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame)
-        """
-        frame = getattr(self, '_latest_frame', None)
-        self._latest_frame = None  # Clear after reading to avoid stale data
-        return (frame is not None), frame
-
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Directly read a frame from the realsense camera (bypassing background thread logic).
+        Read a single frame from the realsense camera.
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
@@ -92,21 +50,61 @@ class RealsenseCapture(VideoCaptureBase):
                 raise  # Re-raise other runtime errors
 
         # if depth_frame and color_frame:
-        #     print("Depth Intrinsics:", depth_frame.profile.as_video_stream_profile().get_intrinsics())
-        #     print("Color Intrinsics:", color_frame.profile.as_video_stream_profile().get_intrinsics())
+        #     print("Depth Intrinsics:", depth_frame.profile.as_video_stream_profile().get_intrinsics())  # noqa: E501
+        #     print("Color Intrinsics:", color_frame.profile.as_video_stream_profile().get_intrinsics())  # noqa: E501
 
         frame_dict = {
-            'raw_color': color_frame,
-            'raw_depth': depth_frame,
-            'aligned_depth': aligned_depth_frame,
-            'aligned_color': aligned_color_frame,
+            "raw_color": color_frame,
+            "raw_depth": depth_frame,
+            "aligned_depth": aligned_depth_frame,
+            "aligned_color": aligned_color_frame,
         }
 
         return True, frame_dict
 
     """Realsense camera capture using Realsense lib."""
 
-    def __init__(self, source: int = 0, **kwargs):
+    def __init__(
+        self,
+        source: int = 0,
+        *,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        fps: Optional[float] = None,
+        processor: Optional[Any] = None,
+        **kwargs,
+    ):
+        """Initialize the RealSense capture.
+
+        Args:
+            source: Camera serial number (str) or device index (int,
+                default: 0).
+            width: Desired color-stream width in pixels. Falls back to the
+                device's maximum supported width when omitted (default:
+                None). Applied on :meth:`connect`.
+            height: Desired color-stream height in pixels. Falls back to the
+                device's maximum supported height when omitted (default:
+                None). Applied on :meth:`connect`.
+            fps: Desired stream frame rate. Falls back to the device's
+                maximum supported frame rate when omitted (default: None).
+                Applied on :meth:`connect`.
+            processor: Frame processor attached at construction time.
+                Defaults to a
+                :class:`~framesource.processors.realsense_depth_processor.RealsenseDepthProcessor`
+                configured for RGB output when not provided.
+            **kwargs: Additional passthrough options stored on ``self.config``.
+        """
+        # Preserve the historical ``self.config`` contents: only forward
+        # explicitly-provided values so the ``self.config.get(...)`` defaults
+        # below keep their old meaning.
+        for _key, _val in (
+            ("width", width),
+            ("height", height),
+            ("fps", fps),
+            ("processor", processor),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
         super().__init__(source, **kwargs)
         self.pipeline = None
         self.device = None
@@ -120,22 +118,30 @@ class RealsenseCapture(VideoCaptureBase):
         self._max_width = 0
         self._max_height = 0
         self._max_fps = 0
-        
+
         self._default_processor = self.config.get("processor", None)
         if self._default_processor is None:
-            self._default_processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.RGB)
+            self._default_processor = RealsenseDepthProcessor(
+                output_format=RealsenseProcessingOutput.RGB
+            )
         self.attach_processor(self._default_processor)
-        
+
         self.source = source if isinstance(source, int) else 0
 
-        if 'is_mono' in kwargs:
-            logger.warning("'is_mono' argument is only used for certain industrial cameras and has no effect for realsense camera.")
+        if "is_mono" in kwargs:
+            logger.warning(
+                "'is_mono' argument is only used for certain industrial cameras "
+                "and has no effect for realsense camera."
+            )
 
     def connect(self) -> bool:
         """Connect to realsense camera."""
         try:
             import pyrealsense2 as rs
+        except ImportError as e:
+            raise MissingDependencyError("pyrealsense2", extra="realsense", details=str(e)) from e
 
+        try:
             # Configure depth and color streams
             self.pipeline = rs.pipeline()
             self._align = rs.align(rs.stream.color)
@@ -196,7 +202,10 @@ class RealsenseCapture(VideoCaptureBase):
             self.profile = self.pipeline.start(config)
 
             self.is_connected = True
-            logger.info(f"Connected to realsense camera {self.source}, {device_name} ({device_product_line} line) (Serial: {serial_number})")
+            logger.info(
+                f"Connected to realsense camera {self.source}, {device_name} "
+                f"({device_product_line} line) (Serial: {serial_number})"
+            )
             return True
         except Exception as e:
             logger.error(f"Error connecting to realsense camera: {e}")
@@ -214,15 +223,6 @@ class RealsenseCapture(VideoCaptureBase):
             logger.error(f"Error disconnecting from realsense camera: {e}")
             return False
 
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Return the latest frame captured by the background thread, or fall back to direct read if not running.
-        """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
-
     def set_exposure(self, value: float) -> bool:
         """Set exposure (1.0 to 165000 for most realsense cameras)."""
         if not self.is_connected or self.pipeline is None:
@@ -231,6 +231,7 @@ class RealsenseCapture(VideoCaptureBase):
         try:
             self._exposure = value
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 if s.supports(rs.option.exposure):
                     s.set_option(rs.option.exposure, int(value))
@@ -250,6 +251,7 @@ class RealsenseCapture(VideoCaptureBase):
 
         try:
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 if s.supports(rs.option.exposure):
                     exposure = s.get_option(rs.option.exposure)
@@ -265,6 +267,7 @@ class RealsenseCapture(VideoCaptureBase):
         try:
             self._gain = value
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 if s.supports(rs.option.gain):
                     s.set_option(rs.option.gain, int(value))
@@ -284,6 +287,7 @@ class RealsenseCapture(VideoCaptureBase):
 
         try:
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 if s.supports(rs.option.gain):
                     gain = s.get_option(rs.option.gain)
@@ -291,14 +295,14 @@ class RealsenseCapture(VideoCaptureBase):
         except Exception:
             return self._gain
 
-
-    def get_exposure_range(self) -> Optional[Tuple[float, float]]:
+    def get_exposure_range(self) -> Optional[tuple[float, float]]:
         """Get current exposure."""
         if not self.is_connected or self.pipeline is None:
             return None
 
         try:
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 if s.supports(rs.option.exposure):
                     exposure = s.get_option_range(rs.option.exposure)
@@ -306,13 +310,14 @@ class RealsenseCapture(VideoCaptureBase):
         except Exception:
             return 0.0, 0.0
 
-    def get_gain_range(self) -> Optional[Tuple[float, float]]:
+    def get_gain_range(self) -> Optional[tuple[float, float]]:
         """Get current gain."""
         if not self.is_connected or self.pipeline is None:
             return None
 
         try:
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 if s.supports(rs.option.gain):
                     gain = s.get_option_range(rs.option.gain)
@@ -322,11 +327,12 @@ class RealsenseCapture(VideoCaptureBase):
 
     def _get_active_profile(self):
         import pyrealsense2 as rs
+
         color_stream = self.profile.get_stream(rs.stream.color)
         video_profile = color_stream.as_video_stream_profile()
         return video_profile
 
-    def get_frame_size(self) -> Optional[Tuple[int, int]]:
+    def get_frame_size(self) -> Optional[tuple[int, int]]:
         """Get frame size."""
         if not self.is_connected or self.profile is None:
             return None
@@ -366,6 +372,7 @@ class RealsenseCapture(VideoCaptureBase):
             return False
         try:
             import pyrealsense2 as rs
+
             for s in self.device.query_sensors():
                 # Check if the sensor supports auto-exposure
                 if s.supports(rs.option.enable_auto_exposure):
@@ -383,148 +390,162 @@ class RealsenseCapture(VideoCaptureBase):
     def discover(cls) -> list:
         """
         Discover available RealSense cameras.
-        
+
         Returns:
             list: List of dictionaries containing RealSense camera information.
-                Each dict contains: {'index': int, 'serial_number': str, 'name': str, 'product_line': str}
+                Each dict contains: {'index': int, 'serial_number': str, 'name': str,
+                'product_line': str}
         """
         devices = []
-        
+
         try:
             import pyrealsense2 as rs
         except ImportError:
             logger.warning("pyrealsense2 module not available. Cannot discover RealSense cameras.")
             return []
-        
+
         try:
             # Get RealSense context
             ctx = rs.context()
-            
+
             # Query all connected devices
             device_list = ctx.query_devices()
-            
+
             for index in range(len(device_list)):
                 try:
                     device = device_list[index]
                     device_data = {
-                        'index': index,
-                        'serial_number': device.get_info(rs.camera_info.serial_number),
-                        'name': device.get_info(rs.camera_info.name),
-                        'product_line': device.get_info(rs.camera_info.product_line)
+                        "index": index,
+                        "serial_number": device.get_info(rs.camera_info.serial_number),
+                        "name": device.get_info(rs.camera_info.name),
+                        "product_line": device.get_info(rs.camera_info.product_line),
                     }
                     devices.append(device_data)
                     logger.info(f"Found RealSense camera: {device_data}")
-                    
+
                 except Exception as e:
                     logger.warning(f"Could not get info for RealSense device {index}: {e}")
                     continue
-            
+
         except Exception as e:
             logger.error(f"Error discovering RealSense cameras: {e}")
-        
+
         return devices
 
     @classmethod
-    def get_config_schema(cls) -> Dict[str, Any]:
+    def get_config_schema(cls) -> dict[str, Any]:
         """Get configuration schema for RealSense camera capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
-            'title': 'RealSense Camera Configuration',
-            'description': 'Configure Intel RealSense depth camera settings',
-            'fields': [
+            "title": "RealSense Camera Configuration",
+            "description": "Configure Intel RealSense depth camera settings",
+            "fields": [
                 {
-                    'name': 'source',
-                    'label': 'Camera Index',
-                    'type': 'number',
-                    'min': 0,
-                    'max': 10,
-                    'placeholder': '0',
-                    'description': 'Camera device index (0 for first RealSense camera)',
-                    'required': False,
-                    'default': 0
+                    "name": "source",
+                    "label": "Camera Index",
+                    "type": "number",
+                    "min": 0,
+                    "max": 10,
+                    "placeholder": "0",
+                    "description": "Camera device index (0 for first RealSense camera)",
+                    "required": False,
+                    "default": 0,
                 },
                 {
-                    'name': 'width',
-                    'label': 'Width',
-                    'type': 'number',
-                    'min': 424,
-                    'max': 1920,
-                    'placeholder': '640',
-                    'description': 'Frame width in pixels',
-                    'required': False,
-                    'default': 640
+                    "name": "width",
+                    "label": "Width",
+                    "type": "number",
+                    "min": 424,
+                    "max": 1920,
+                    "placeholder": "640",
+                    "description": "Frame width in pixels",
+                    "required": False,
+                    "default": 640,
                 },
                 {
-                    'name': 'height',
-                    'label': 'Height',
-                    'type': 'number',
-                    'min': 240,
-                    'max': 1080,
-                    'placeholder': '480',
-                    'description': 'Frame height in pixels',
-                    'required': False,
-                    'default': 480
+                    "name": "height",
+                    "label": "Height",
+                    "type": "number",
+                    "min": 240,
+                    "max": 1080,
+                    "placeholder": "480",
+                    "description": "Frame height in pixels",
+                    "required": False,
+                    "default": 480,
                 },
                 {
-                    'name': 'fps',
-                    'label': 'Frame Rate (FPS)',
-                    'type': 'number',
-                    'min': 6,
-                    'max': 90,
-                    'placeholder': '30',
-                    'description': 'Frames per second',
-                    'required': False,
-                    'default': 30
+                    "name": "fps",
+                    "label": "Frame Rate (FPS)",
+                    "type": "number",
+                    "min": 6,
+                    "max": 90,
+                    "placeholder": "30",
+                    "description": "Frames per second",
+                    "required": False,
+                    "default": 30,
                 },
                 {
-                    'name': 'depth_range_min',
-                    'label': 'Min Depth Range (m)',
-                    'type': 'number',
-                    'min': 0.1,
-                    'max': 5.0,
-                    'step': 0.1,
-                    'placeholder': '0.3',
-                    'description': 'Minimum depth detection range in meters',
-                    'required': False,
-                    'default': 0.3
+                    "name": "depth_range_min",
+                    "label": "Min Depth Range (m)",
+                    "type": "number",
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.1,
+                    "placeholder": "0.3",
+                    "description": "Minimum depth detection range in meters",
+                    "required": False,
+                    "default": 0.3,
                 },
                 {
-                    'name': 'depth_range_max',
-                    'label': 'Max Depth Range (m)',
-                    'type': 'number',
-                    'min': 1.0,
-                    'max': 10.0,
-                    'step': 0.1,
-                    'placeholder': '3.0',
-                    'description': 'Maximum depth detection range in meters',
-                    'required': False,
-                    'default': 3.0
+                    "name": "depth_range_max",
+                    "label": "Max Depth Range (m)",
+                    "type": "number",
+                    "min": 1.0,
+                    "max": 10.0,
+                    "step": 0.1,
+                    "placeholder": "3.0",
+                    "description": "Maximum depth detection range in meters",
+                    "required": False,
+                    "default": 3.0,
                 },
                 {
-                    'name': 'output_type',
-                    'label': 'Output Type',
-                    'type': 'select',
-                    'options': [
-                        {'value': 'color', 'label': 'Color Only'},
-                        {'value': 'depth', 'label': 'Depth Only'},
-                        {'value': 'both', 'label': 'Color + Depth'}
+                    "name": "output_type",
+                    "label": "Output Type",
+                    "type": "select",
+                    "options": [
+                        {"value": "color", "label": "Color Only"},
+                        {"value": "depth", "label": "Depth Only"},
+                        {"value": "both", "label": "Color + Depth"},
                     ],
-                    'description': 'Type of output frames',
-                    'required': False,
-                    'default': 'color'
-                }
-            ]
+                    "description": "Type of output frames",
+                    "required": False,
+                    "default": "color",
+                },
+            ],
         }
 
 
 if __name__ == "__main__":
     # Example usage
-    camera = RealsenseCapture(width=640, height=480, processor=RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE))
-    
-    # processor = RealsenseDepthProcessor(output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE)
+    camera = RealsenseCapture(
+        width=640,
+        height=480,
+        processor=RealsenseDepthProcessor(
+            output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE
+        ),
+    )
+
+    # processor = RealsenseDepthProcessor(
+    #     output_format=RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE
+    # )
     # camera.attach_processor(processor)
 
     if camera.connect():
-        # camera.start_async()
         print("Realsense camera connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
@@ -535,7 +556,7 @@ if __name__ == "__main__":
             ret, frame = camera.read()
             if ret:
                 cv2.imshow("Realsense camera", frame)  # type: ignore
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
         camera.stop()

@@ -4,27 +4,31 @@ This package contains various frame processing modules for handling different
 types of image transformations and manipulations.
 """
 
-from .frame_processor import FrameProcessor
 from .equirectangular360_processor import Equirectangular2PinholeProcessor
 from .fisheye2equirectangular_processor import Fisheye2EquirectangularProcessor
+from .frame_processor import FrameProcessor
 
 __all__ = [
-    'FrameProcessor',
-    'Equirectangular2PinholeProcessor',
-    'Fisheye2EquirectangularProcessor',
+    "FrameProcessor",
+    "Equirectangular2PinholeProcessor",
+    "Fisheye2EquirectangularProcessor",
 ]
 
 # Conditionally import RealsenseDepthProcessor if pyrealsense2 is available
 try:
-    from .realsense_depth_processor import RealsenseDepthProcessor
-    __all__.append('RealsenseDepthProcessor')
+    from .realsense_depth_processor import RealsenseDepthProcessor as RealsenseDepthProcessor
+
+    __all__.append("RealsenseDepthProcessor")
 except ImportError:
     # pyrealsense2 not available
     pass
 
 # Conditionally import HyperspectralChannelSelector if its dependencies are available
 try:
-    from .hyperspectral_processor import HyperspectralChannelSelector
-    __all__.append('HyperspectralChannelSelector')
+    from .hyperspectral_processor import (
+        HyperspectralChannelSelector as HyperspectralChannelSelector,
+    )
+
+    __all__.append("HyperspectralChannelSelector")
 except ImportError:
     pass

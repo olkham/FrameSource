@@ -1,5 +1,6 @@
 import math
-from typing import Tuple, Optional
+from typing import Optional
+
 import cv2
 import numpy as np
 from numba import njit, prange
@@ -8,9 +9,9 @@ from .frame_processor import FrameProcessor, FrameType
 
 
 @njit(cache=True, fastmath=True)
-def generate_fisheye_mapping_jit(output_width, output_height,
-                                  fisheye_cx, fisheye_cy, fisheye_radius,
-                                  frame_height, frame_width):
+def generate_fisheye_mapping_jit(
+    output_width, output_height, fisheye_cx, fisheye_cy, fisheye_radius, frame_height, frame_width
+):
     """JIT-compiled coordinate mapping for fisheye to equirectangular conversion.
 
     Maps a 180-degree equidistant fisheye (circular) image to equirectangular format.
@@ -62,7 +63,9 @@ def generate_fisheye_mapping_jit(output_width, output_height,
 
             # Convert polar (r, phi) to cartesian fisheye pixel coordinates
             fisheye_x = fisheye_cx + r * math.cos(phi)
-            fisheye_y = fisheye_cy - r * math.sin(phi)  # Negative because image Y increases downward
+            fisheye_y = fisheye_cy - r * math.sin(
+                phi
+            )  # Negative because image Y increases downward
 
             pixel_x[j, i] = fisheye_x
             pixel_y[j, i] = fisheye_y
@@ -71,9 +74,9 @@ def generate_fisheye_mapping_jit(output_width, output_height,
 
 
 @njit(cache=True, fastmath=True, parallel=True)
-def generate_fisheye_mapping_jit_parallel(output_width, output_height,
-                                          fisheye_cx, fisheye_cy, fisheye_radius,
-                                          frame_height, frame_width):
+def generate_fisheye_mapping_jit_parallel(
+    output_width, output_height, fisheye_cx, fisheye_cy, fisheye_radius, frame_height, frame_width
+):
     """Parallel JIT-compiled coordinate mapping for fisheye to equirectangular conversion."""
 
     pixel_x = np.empty((output_height, output_width), dtype=np.float32)
@@ -126,16 +129,21 @@ class Fisheye2EquirectangularProcessor(FrameProcessor):
     the front hemisphere (±90° from center) of the equirectangular output.
 
     Parameters:
-        fisheye_cx: X coordinate of fisheye center in input image (default: auto-detect as image center)
-        fisheye_cy: Y coordinate of fisheye center in input image (default: auto-detect as image center)
-        fisheye_radius: Radius of the fisheye circle in pixels (default: auto-detect as min(width, height)/2)
+        fisheye_cx: X coordinate of fisheye center in input image
+            (default: auto-detect as image center)
+        fisheye_cy: Y coordinate of fisheye center in input image
+            (default: auto-detect as image center)
+        fisheye_radius: Radius of the fisheye circle in pixels
+            (default: auto-detect as min(width, height)/2)
         output_width: Width of equirectangular output (default: 1920)
         output_height: Height of equirectangular output (default: 960, standard 2:1 aspect ratio)
 
     Example usage:
         # Create processor chain for fisheye PTZ control
         fisheye2equi = Fisheye2EquirectangularProcessor(output_width=1920, output_height=960)
-        equi2pinhole = Equirectangular2PinholeProcessor(fov=90, output_width=1280, output_height=720)
+        equi2pinhole = Equirectangular2PinholeProcessor(
+            fov=90, output_width=1280, output_height=720
+        )
 
         # Process frame
         equi_frame = fisheye2equi.process(fisheye_frame)
@@ -146,16 +154,21 @@ class Fisheye2EquirectangularProcessor(FrameProcessor):
         equi2pinhole.set_parameter('pitch', -15) # Tilt up 15°
     """
 
-    def __init__(self, output_width: int = 1920, output_height: int = 960,
-                 fisheye_cx: Optional[float] = None, fisheye_cy: Optional[float] = None,
-                 fisheye_radius: Optional[float] = None):
+    def __init__(
+        self,
+        output_width: int = 1920,
+        output_height: int = 960,
+        fisheye_cx: Optional[float] = None,
+        fisheye_cy: Optional[float] = None,
+        fisheye_radius: Optional[float] = None,
+    ):
         super().__init__()
         self._parameters = {
-            'fisheye_cx': fisheye_cx,
-            'fisheye_cy': fisheye_cy,
-            'fisheye_radius': fisheye_radius,
-            'output_width': output_width,
-            'output_height': output_height
+            "fisheye_cx": fisheye_cx,
+            "fisheye_cy": fisheye_cy,
+            "fisheye_radius": fisheye_radius,
+            "output_width": output_width,
+            "output_height": output_height,
         }
 
         # Coordinate mapping cache
@@ -164,27 +177,34 @@ class Fisheye2EquirectangularProcessor(FrameProcessor):
 
     def process(self, frame: FrameType) -> FrameType:
         """Convert fisheye frame to equirectangular projection."""
-        output_width = self._parameters['output_width']
-        output_height = self._parameters['output_height']
+        output_width = self._parameters["output_width"]
+        output_height = self._parameters["output_height"]
 
         # Auto-detect fisheye parameters if not specified
         frame_height, frame_width = frame.shape[:2]
 
-        fisheye_cx = self._parameters['fisheye_cx']
+        fisheye_cx = self._parameters["fisheye_cx"]
         if fisheye_cx is None:
             fisheye_cx = frame_width / 2.0
 
-        fisheye_cy = self._parameters['fisheye_cy']
+        fisheye_cy = self._parameters["fisheye_cy"]
         if fisheye_cy is None:
             fisheye_cy = frame_height / 2.0
 
-        fisheye_radius = self._parameters['fisheye_radius']
+        fisheye_radius = self._parameters["fisheye_radius"]
         if fisheye_radius is None:
             fisheye_radius = min(frame_width, frame_height) / 2.0
 
         # Create cache key
-        cache_key = (fisheye_cx, fisheye_cy, fisheye_radius,
-                     output_width, output_height, frame_height, frame_width)
+        cache_key = (
+            fisheye_cx,
+            fisheye_cy,
+            fisheye_radius,
+            output_width,
+            output_height,
+            frame_height,
+            frame_width,
+        )
 
         # Check cache for coordinate mapping
         if cache_key in self._map_cache:
@@ -192,8 +212,13 @@ class Fisheye2EquirectangularProcessor(FrameProcessor):
         else:
             # Generate new mapping
             pixel_x, pixel_y = self._generate_coordinate_mapping(
-                fisheye_cx, fisheye_cy, fisheye_radius,
-                output_width, output_height, frame_height, frame_width
+                fisheye_cx,
+                fisheye_cy,
+                fisheye_radius,
+                output_width,
+                output_height,
+                frame_height,
+                frame_width,
             )
 
             # Cache management
@@ -204,28 +229,48 @@ class Fisheye2EquirectangularProcessor(FrameProcessor):
             self._map_cache[cache_key] = (pixel_x, pixel_y)
 
         # Apply remapping with black border for out-of-bounds areas
-        return cv2.remap(frame, pixel_x, pixel_y, cv2.INTER_LINEAR,
-                        borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+        return cv2.remap(
+            frame,
+            pixel_x,
+            pixel_y,
+            cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(0, 0, 0),
+        )
 
-    def _generate_coordinate_mapping(self, fisheye_cx: float, fisheye_cy: float,
-                                     fisheye_radius: float, output_width: int,
-                                     output_height: int, frame_height: int,
-                                     frame_width: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _generate_coordinate_mapping(
+        self,
+        fisheye_cx: float,
+        fisheye_cy: float,
+        fisheye_radius: float,
+        output_width: int,
+        output_height: int,
+        frame_height: int,
+        frame_width: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Generate coordinate mapping for fisheye to equirectangular projection."""
 
         total_pixels = output_width * output_height
 
         if total_pixels > 500000:
             return generate_fisheye_mapping_jit_parallel(
-                output_width, output_height,
-                fisheye_cx, fisheye_cy, fisheye_radius,
-                frame_height, frame_width
+                output_width,
+                output_height,
+                fisheye_cx,
+                fisheye_cy,
+                fisheye_radius,
+                frame_height,
+                frame_width,
             )
         else:
             return generate_fisheye_mapping_jit(
-                output_width, output_height,
-                fisheye_cx, fisheye_cy, fisheye_radius,
-                frame_height, frame_width
+                output_width,
+                output_height,
+                fisheye_cx,
+                fisheye_cy,
+                fisheye_radius,
+                frame_height,
+                frame_width,
             )
 
     def clear_cache(self) -> None:
@@ -240,12 +285,12 @@ class Fisheye2EquirectangularProcessor(FrameProcessor):
             cy: Y coordinate of fisheye center
             radius: Radius of the fisheye circle in pixels
         """
-        self._parameters['fisheye_cx'] = cx
-        self._parameters['fisheye_cy'] = cy
-        self._parameters['fisheye_radius'] = radius
+        self._parameters["fisheye_cx"] = cx
+        self._parameters["fisheye_cy"] = cy
+        self._parameters["fisheye_radius"] = radius
         self.clear_cache()
 
-    def auto_detect_fisheye_circle(self, frame: FrameType) -> Tuple[float, float, float]:
+    def auto_detect_fisheye_circle(self, frame: FrameType) -> tuple[float, float, float]:
         """Attempt to auto-detect the fisheye circle from the frame.
 
         This uses a simple heuristic based on finding the largest dark border.

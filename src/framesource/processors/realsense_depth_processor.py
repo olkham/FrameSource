@@ -1,18 +1,19 @@
 from enum import Enum
-from typing import Dict, Any
+from typing import Any
 
 import cv2
 import numpy as np
 
 try:
-    import pyrealsense2 as rs
-except ImportError:
+    import pyrealsense2 as rs  # noqa: F401 - availability probe; raises a friendlier error below
+except ImportError as e:
     raise ImportError(
         "pyrealsense2 is required for RealsenseDepthProcessor. "
         "Install it with: pip install pyrealsense2"
-    )
+    ) from e
 
 from .frame_processor import FrameProcessor, FrameType
+
 
 class RealsenseProcessingOutput(Enum):
     RGB = 1
@@ -21,10 +22,14 @@ class RealsenseProcessingOutput(Enum):
     ALIGNED_DEPTH_COLORIZED = 5
     RGBD = 6
 
+
 class RealsenseDepthProcessor(FrameProcessor):
     """Base class for all frame processors."""
 
-    def __init__(self, output_format: RealsenseProcessingOutput = RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE):
+    def __init__(
+        self,
+        output_format: RealsenseProcessingOutput = RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE,
+    ):
         super().__init__()
         self.output_format = output_format
 
@@ -33,14 +38,16 @@ class RealsenseDepthProcessor(FrameProcessor):
         if isinstance(frame, np.ndarray):
             return frame
 
-        color_frame = frame['aligned_color']
-        aligned_depth_frame = frame['aligned_depth']
+        color_frame = frame["aligned_color"]
+        aligned_depth_frame = frame["aligned_depth"]
 
         color_image = np.asanyarray(color_frame.get_data())
         aligned_depth_image = np.asanyarray(aligned_depth_frame.get_data())
 
         # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(aligned_depth_image, alpha=0.03), cv2.COLORMAP_JET)
+        depth_colormap = cv2.applyColorMap(
+            cv2.convertScaleAbs(aligned_depth_image, alpha=0.03), cv2.COLORMAP_JET
+        )
 
         depth_colormap_dim = depth_colormap.shape
         color_colormap_dim = color_image.shape
@@ -51,10 +58,14 @@ class RealsenseDepthProcessor(FrameProcessor):
             rgbd = np.dstack((color_image, aligned_depth_image))
             return rgbd
         elif self.output_format == RealsenseProcessingOutput.ALIGNED_SIDE_BY_SIDE:
-            # If depth and color resolutions are different, resize color image to match depth image for display
+            # If depth and color resolutions are different, resize color image to
+            # match depth image for display
             if depth_colormap_dim != color_colormap_dim:
-                resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
-                                                 interpolation=cv2.INTER_AREA)
+                resized_color_image = cv2.resize(
+                    color_image,
+                    dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
+                    interpolation=cv2.INTER_AREA,
+                )
                 images = np.hstack((resized_color_image, depth_colormap))
             else:
                 images = np.hstack((color_image, depth_colormap))
@@ -74,6 +85,6 @@ class RealsenseDepthProcessor(FrameProcessor):
         """Get a processing parameter."""
         return self._parameters.get(name)
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get all processing parameters."""
         return self._parameters.copy()

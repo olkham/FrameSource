@@ -1,4 +1,5 @@
 include README.md
 include LICENSE
 recursive-include src/framesource *.py
+recursive-include src/frame_source *.py
 include src/framesource/py.typed

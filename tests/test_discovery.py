@@ -1,6 +1,8 @@
 # Test OpenCV compatibility with FrameSourceFactory
-from framesource import FrameSourceFactory
 import cv2
+
+from framesource import FrameSourceFactory
+
 
 def main(framework: str = "opencv"):
     """Run OpenCV compatibility tests."""
@@ -9,7 +11,7 @@ def main(framework: str = "opencv"):
 
     cv2.namedWindow("Test", cv2.WINDOW_NORMAL)
 
-    cap = FrameSourceFactory.create(capture_type='webcam')
+    cap = FrameSourceFactory.create(capture_type="webcam")
 
     cameras = cap.discover()
     print(f"Discovered cameras: {cameras}")

@@ -1,132 +1,98 @@
-#!/usr/bin/env python3
-"""
-Simple test demonstrating external threading for FrameSource library.
+"""External-threading tests for FrameSource.
 
-This script shows how moving threading outside the core classes provides
-better control and eliminates race conditions.
+These verify the recommended concurrency model: capture classes are synchronous
+and concurrency lives in the caller via `simple_frame_producer` and a queue.
+No hardware is required — `MockCapture` provides deterministic frames.
 """
 
-import time
-import threading
 import queue
-import cv2
-import numpy as np
-from typing import Optional, Tuple
-from framesource.sources.webcam_capture import WebcamCapture
-from framesource.sources.realsense_capture import RealsenseCapture
+import threading
+import time
+
+import pytest
+from conftest import MockCapture
+
+from framesource import Frame, FrameProducer
 from framesource.threading_utils import simple_frame_producer
 
-n_frames = 1000
 
-
-def test_current_vs_external():
-    """Compare current implementation vs external threading."""
-    
-    print("=== Comparison: Current vs External Threading ===\n")
-    
-    # Test 1: Current implementation
-    print("1. Testing CURRENT implementation (built-in threading):")
-    camera_current = WebcamCapture(width=640, height=480)
-    # camera_current = RealsenseCapture(width=640, height=480)
-    
-    camera_current.connect()
-    # camera_current.set_frame_size(1920, 1080)
-    # camera_current.set_fps(30)
-    camera_current.start_async()  # Uses internal threading
-    
-    time.sleep(0.5)  # Allow connection to stabilize
-    if camera_current.is_connected:
-        print("   Connected successfully")
-        frames_received = 0
-        start_time = time.time()
-        
-        while frames_received < n_frames:
-            success, frame = camera_current.read()
-            if success and frame is not None:
-                frames_received += 1
-                cv2.imshow("Current Camera", frame)
-                key = cv2.waitKey(1)
-                if key == ord('q'):
-                    break
-            # time.sleep(0.02)  # Simulate processing
-        
-        elapsed = time.time() - start_time
-        print(f"   Received {frames_received} frames in {elapsed:.2f}s")
-        print(f"   Average FPS: {frames_received/elapsed:.1f}")
-        
-        camera_current.stop()
-        camera_current.disconnect()
-    else:
-        print("   Failed to connect to webcam")
-    
-    cv2.destroyAllWindows()
-    print()
-    
-    # Test 2: External threading approach
-    print("2. Testing EXTERNAL threading approach:")
-    
-    # Create synchronous capture source
-    camera_external = WebcamCapture(width=640, height=480)
-    # camera_external = RealsenseCapture(width=640, height=480)
-    
-    # camera_external.set_frame_size(1920, 1080)
-    # camera_external.set_fps(30)
-    
-    # Set up external threading
-    frame_queue = queue.Queue(maxsize=10)
+def test_simple_frame_producer_fills_queue():
+    camera = MockCapture()
+    frame_queue: queue.Queue = queue.Queue(maxsize=10)
     stop_event = threading.Event()
-    
-    # Start producer thread
-    producer_thread = threading.Thread(
+
+    producer = threading.Thread(
         target=simple_frame_producer,
-        args=(camera_external, frame_queue, stop_event),
-        daemon=True
+        args=(camera, frame_queue, stop_event),
+        daemon=True,
     )
-    producer_thread.start()
-    
-    time.sleep(0.5)  # Let producer start
-    
-    frames_received = 0
-    start_time = time.time()
-    
-    # Consumer loop
-    while frames_received < n_frames:
+    producer.start()
+
+    received = 0
+    deadline = time.time() + 2.0
+    while received < 5 and time.time() < deadline:
         try:
             success, frame = frame_queue.get(timeout=0.1)
-            if success and frame is not None:
-                frames_received += 1
-                # Simulate processing
-                cv2.imshow("External Camera", frame)
-                key = cv2.waitKey(1)
-                if key == ord('q'):
-                    break
         except queue.Empty:
             continue
-    
-    elapsed = time.time() - start_time
-    print(f"   Received {frames_received} frames in {elapsed:.2f}s")
-    print(f"   Average FPS: {frames_received/elapsed:.1f}")
-    
-    # Clean up
+        if success and frame is not None:
+            assert isinstance(frame, Frame)
+            received += 1
+
     stop_event.set()
-    producer_thread.join(timeout=2)
+    producer.join(timeout=2)
+    assert received >= 5
 
 
-def main():
-    """Run all the tests."""
-    print("FrameSource External Threading Demonstration")
-    print("=" * 50)
-    
+def test_frame_producer_stats_include_avg_latency():
+    camera = MockCapture()
+    producer = FrameProducer(camera, max_queue_size=10, target_fps=None)
+    producer.start()
+
+    # Drain frames so the producer keeps capturing.
+    deadline = time.time() + 2.0
+    drained = 0
+    while drained < 5 and time.time() < deadline:
+        ok, _ = producer.get_frame(timeout=0.1)
+        if ok:
+            drained += 1
+
+    producer.stop()
+    stats = producer.get_stats()
+    assert "avg_latency" in stats
+    assert stats["frames_captured"] >= 1
+    assert "fps" in stats
+
+
+def test_frame_producer_reports_drops_on_small_queue():
+    # A tiny queue that is never drained should accumulate drops.
+    camera = MockCapture()
+    producer = FrameProducer(camera, max_queue_size=1, target_fps=None)
+    producer.start()
+    time.sleep(0.5)
+    producer.stop()
+
+    stats = producer.get_stats()
+    assert stats["frames_dropped"] > 0
+
+
+@pytest.mark.hardware
+def test_webcam_external_threading():
+    """Opt-in hardware test (run with `pytest -m hardware`)."""
+    from framesource import WebcamCapture
+
+    camera = WebcamCapture(source=0)
+    frame_queue: queue.Queue = queue.Queue(maxsize=10)
+    stop_event = threading.Event()
+    producer = threading.Thread(
+        target=simple_frame_producer,
+        args=(camera, frame_queue, stop_event, 30),
+        daemon=True,
+    )
+    producer.start()
     try:
-        test_current_vs_external()
-        
-    except KeyboardInterrupt:
-        print("\nTest interrupted by user")
-    except Exception as e:
-        print(f"\nTest failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-if __name__ == "__main__":
-    main()
+        success, frame = frame_queue.get(timeout=5.0)
+        assert success and frame is not None
+    finally:
+        stop_event.set()
+        producer.join(timeout=2)

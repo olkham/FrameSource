@@ -1,65 +1,102 @@
-from typing import Optional, Tuple, Any, Dict
-import numpy as np
-import cv2
 import logging
-try:
-    from .video_capture_base import VideoCaptureBase
-except ImportError:
-    from video_capture_base import VideoCaptureBase
 import time
+import warnings
+from typing import Any, Optional
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+import cv2
+import numpy as np
+
+from .video_capture_base import VideoCaptureBase
+
 logger = logging.getLogger(__name__)
 
 
 class VideoFileCapture(VideoCaptureBase):
     has_discovery = False  # Uses file paths, not discoverable devices
-    
-    def start_async(self):
-        """
-        Start background thread to continuously capture frames from video file.
-        """
-        import threading
-        import time
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return  # Already running
-        self._stop_event = threading.Event()
-        self._latest_frame = None
-        self._capture_thread = threading.Thread(target=self._background_capture, daemon=True)
-        self._capture_thread.start()
+    supports_exposure = False  # Video files have no controllable exposure
+    supports_gain = False  # Video files have no controllable gain
 
-    def stop(self):
-        """
-        Stop background frame capture thread.
-        """
-        if hasattr(self, '_stop_event') and self._stop_event is not None:
-            self._stop_event.set()
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None:
-            self._capture_thread.join(timeout=2)
-        self._capture_thread = None
-        self._stop_event = None
+    """Video file capture using OpenCV."""
 
-    def _background_capture(self):
-        import time
-        while not self._stop_event.is_set(): # type: ignore
-            success, frame = self._read_direct()
-            if success:
-                self._latest_frame = frame
-            time.sleep(0.01)  # ~100 FPS max, adjust as needed
+    def __init__(
+        self,
+        source: str,
+        *,
+        loop: bool = False,
+        real_time: bool = True,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        fps: Optional[float] = None,
+        **kwargs,
+    ):
+        """Initialize the video file capture.
 
-    def get_latest_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
+        Args:
+            source: Path to the video file.
+            loop: Restart playback from the beginning when the end is reached.
+            real_time: Play at the file's native frame rate (disable for
+                fastest processing).
+            width: Optional target frame width (applied on :meth:`connect`).
+            height: Optional target frame height (applied on :meth:`connect`).
+            fps: Optional target frame rate (applied on :meth:`connect`).
+            **kwargs: Additional passthrough options stored on ``self.config``.
         """
-        Get the most recent frame captured by the background thread.
-        Returns:
-            Tuple[bool, Optional[np.ndarray]]: (success, frame) where success indicates if frame is available
-        """
-        frame = getattr(self, '_latest_frame', None)
-        return (frame is not None), frame
+        # Forward the promoted options back into ``self.config`` so behaviour
+        # that reads them (``connect()`` for width/height/fps) is preserved.
+        for _key, _val in (
+            ("loop", loop),
+            ("real_time", real_time),
+            ("width", width),
+            ("height", height),
+            ("fps", fps),
+        ):
+            if _val is not None:
+                kwargs[_key] = _val
+        super().__init__(source, **kwargs)
+        self.cap = None
+        self.loop = loop
+        self.real_time = real_time
+        self.time_of_last_frame = 0.0
 
-    def _read_direct(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def connect(self) -> bool:
+        """Connect to video file."""
+        try:
+            self.cap = cv2.VideoCapture(self.source)
+            if not self.cap.isOpened():
+                logger.error(f"Failed to open video file {self.source}")
+                return False
+
+            # Set additional parameters if provided
+            if "width" in self.config:
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config["width"])
+            if "height" in self.config:
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config["height"])
+            if "fps" in self.config:
+                self.cap.set(cv2.CAP_PROP_FPS, self.config["fps"])
+
+            self.is_connected = True
+            logger.info(f"Connected to video file {self.source}")
+            return True
+        except Exception as e:
+            logger.error(f"Error connecting to video file: {e}")
+            return False
+
+    def disconnect(self) -> bool:
+        """Disconnect from video file."""
+        try:
+            if self.cap is not None:
+                self.cap.release()
+                self.cap = None
+            self.is_connected = False
+            logger.info("Disconnected from video file")
+            return True
+        except Exception as e:
+            logger.error(f"Error disconnecting from video file: {e}")
+            return False
+
+    def _read_implementation(self) -> tuple[bool, Optional[np.ndarray]]:
         """
-        Directly read a frame from the video file (bypassing background thread logic).
+        Read a single frame from the video file.
         Returns:
             Tuple[bool, Optional[np.ndarray]]: (success, frame)
         """
@@ -84,74 +121,20 @@ class VideoFileCapture(VideoCaptureBase):
                 self.time_of_last_frame = time.time()
         return ret, frame if ret else None
 
-    """Video file capture using OpenCV."""
-    
-    def __init__(self, source: str, **kwargs):
-        super().__init__(source, **kwargs)
-        self.cap = None
-        self.loop = kwargs.get('loop', False)
-        self.real_time = kwargs.get('real_time', True)
-        self.time_of_last_frame = 0.0
-        
-    def connect(self) -> bool:
-        """Connect to video file."""
-        try:
-            self.cap = cv2.VideoCapture(self.source)
-            if not self.cap.isOpened():
-                logger.error(f"Failed to open video file {self.source}")
-                return False
-            
-            # Set additional parameters if provided
-            if 'width' in self.config:
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config['width'])
-            if 'height' in self.config:
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config['height'])
-            if 'fps' in self.config:
-                self.cap.set(cv2.CAP_PROP_FPS, self.config['fps'])
-                
-            self.is_connected = True
-            logger.info(f"Connected to video file {self.source}")
-            return True
-        except Exception as e:
-            logger.error(f"Error connecting to video file: {e}")
-            return False
-    
-    def disconnect(self) -> bool:
-        """Disconnect from video file."""
-        try:
-            if self.cap is not None:
-                self.cap.release()
-                self.cap = None
-            self.is_connected = False
-            logger.info("Disconnected from video file")
-            return True
-        except Exception as e:
-            logger.error(f"Error disconnecting from video file: {e}")
-            return False
-    
-    def _read_implementation(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """
-        Return the latest frame captured by the background thread, or fall back to direct read if not running.
-        """
-        if hasattr(self, '_capture_thread') and self._capture_thread is not None and self._capture_thread.is_alive():
-            return self.get_latest_frame()
-        else:
-            return self._read_direct()
-    
     def set_exposure(self, value: float) -> bool:
         """Set exposure (not applicable for video files)."""
         logger.warning("Exposure control not applicable for video files")
         return False
-    
+
     def get_exposure(self) -> Optional[float]:
         """Get exposure (not applicable for video files)."""
         return None
-    
+
     def set_gain(self, value: float) -> bool:
         """Set gain (not applicable for video files)."""
         logger.warning("Gain control not applicable for video files")
         return False
-    
+
     def get_gain(self) -> Optional[float]:
         """Get gain (not applicable for video files)."""
         return None
@@ -159,16 +142,16 @@ class VideoFileCapture(VideoCaptureBase):
     def enable_auto_exposure(self, enable: bool = True) -> bool:
         """
         Enable or disable auto exposure (not applicable for video files).
-        
+
         Args:
             enable: True to enable, False to disable
-        
+
         Returns:
             bool: Always False for video files
         """
         logger.warning("Auto exposure control not applicable for video files")
         return False
-    
+
     def set_frame_size(self, width: int, height: int) -> bool:
         """Set frame size (not applicable for video files)."""
         logger.warning("Setting resolution is not applicable for video files")
@@ -178,7 +161,7 @@ class VideoFileCapture(VideoCaptureBase):
     def discover(cls) -> list:
         """
         Discover method for video file capture.
-        
+
         Returns:
             list: Empty list, as discovery is not applicable for file-based sources.
                 Use this class directly with file paths as the source parameter.
@@ -188,57 +171,68 @@ class VideoFileCapture(VideoCaptureBase):
         return []
 
     @classmethod
-    def get_config_schema(cls) -> Dict[str, Any]:
+    def get_config_schema(cls) -> dict[str, Any]:
         """Get configuration schema for video file capture"""
+        warnings.warn(
+            "get_config_schema() is deprecated and will be removed in a future release; "
+            "UI form schemas belong in the consuming application.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return {
-            'title': 'Video File Configuration',
-            'description': 'Configure video file playback settings',
-            'fields': [
+            "title": "Video File Configuration",
+            "description": "Configure video file playback settings",
+            "fields": [
                 {
-                    'name': 'source',
-                    'label': 'Video File Path',
-                    'type': 'text',
-                    'placeholder': 'C:/path/to/video.mp4',
-                    'description': 'Full path to video file (supports .mp4, .avi, .mov, .mkv, .wmv, .flv, .webm)',
-                    'required': True
+                    "name": "source",
+                    "label": "Video File Path",
+                    "type": "text",
+                    "placeholder": "C:/path/to/video.mp4",
+                    "description": (
+                        "Full path to video file (supports .mp4, .avi, .mov, .mkv, "
+                        ".wmv, .flv, .webm)"
+                    ),
+                    "required": True,
                 },
                 {
-                    'name': 'loop',
-                    'label': 'Loop Playback',
-                    'type': 'checkbox',
-                    'description': 'Restart video from beginning when it ends',
-                    'required': False,
-                    'default': False
+                    "name": "loop",
+                    "label": "Loop Playback",
+                    "type": "checkbox",
+                    "description": "Restart video from beginning when it ends",
+                    "required": False,
+                    "default": False,
                 },
                 {
-                    'name': 'real_time',
-                    'label': 'Real-time Playback',
-                    'type': 'checkbox',
-                    'description': 'Play video at original frame rate (disable for fastest processing)',
-                    'required': False,
-                    'default': True
+                    "name": "real_time",
+                    "label": "Real-time Playback",
+                    "type": "checkbox",
+                    "description": (
+                        "Play video at original frame rate (disable for fastest processing)"
+                    ),
+                    "required": False,
+                    "default": True,
                 },
                 {
-                    'name': 'width',
-                    'label': 'Width',
-                    'type': 'number',
-                    'min': 160,
-                    'max': 4096,
-                    'placeholder': '1920',
-                    'description': 'Resize frame width (optional)',
-                    'required': False
+                    "name": "width",
+                    "label": "Width",
+                    "type": "number",
+                    "min": 160,
+                    "max": 4096,
+                    "placeholder": "1920",
+                    "description": "Resize frame width (optional)",
+                    "required": False,
                 },
                 {
-                    'name': 'height',
-                    'label': 'Height',
-                    'type': 'number',
-                    'min': 120,
-                    'max': 2160,
-                    'placeholder': '1080',
-                    'description': 'Resize frame height (optional)',
-                    'required': False
-                }
-            ]
+                    "name": "height",
+                    "label": "Height",
+                    "type": "number",
+                    "min": 120,
+                    "max": 2160,
+                    "placeholder": "1080",
+                    "description": "Resize frame height (optional)",
+                    "required": False,
+                },
+            ],
         }
 
 
@@ -246,19 +240,19 @@ if __name__ == "__main__":
     # Example usage
     video_file = "path/to/your/video.mp4"  # Replace with your video file path
     camera = VideoFileCapture(source=video_file, loop=True, real_time=True)
-    
+
     if camera.connect():
         print("Webcam connected successfully.")
         print(f"Exposure: {camera.get_exposure()}")
         print(f"Gain: {camera.get_gain()}")
         print(f"Frame size: {camera.get_frame_size()}")
-        
+
         # Read a few frames
         while camera.is_connected:
             ret, frame = camera.read()
             if ret and frame is not None:
                 cv2.imshow("Webcam", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
         camera.disconnect()
     else:

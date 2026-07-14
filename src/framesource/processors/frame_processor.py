@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-import numpy as np
-from typing import Dict, Any, Union
+from typing import Any, Union
 
-FrameType = Union[np.ndarray, Dict[str, np.ndarray]]
+import numpy as np
+
+FrameType = Union[np.ndarray, dict[str, np.ndarray]]
 
 
 class FrameProcessor(ABC):
@@ -24,6 +25,6 @@ class FrameProcessor(ABC):
         """Get a processing parameter."""
         return self._parameters.get(name)
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get all processing parameters."""
         return self._parameters.copy()

@@ -72,6 +72,25 @@ This directory contains organized examples for all FrameSource capture types. Ea
 - Mixed camera types support
 - Centralized control and monitoring
 
+### 11. **inference_pipeline_example.py** - Slow Model on a Live Stream
+- `FrameProducer` feeding a stubbed (cv2-only) slow "model"
+- Queue back-pressure with a small `max_queue_size` (newest frames dropped)
+- Reads from the queue at model pace while the producer keeps the source drained
+- Prints `FrameProducer.get_stats()` (frames_dropped, avg_latency) plus consumer staleness
+- Hardware-free (uses `media/geti_demo.mp4`, looped)
+
+### 12. **record_replay_example.py** - Record then Replay with Metadata
+- Phase 1: capture N frames and write timestamped PNGs (count + timestamp in the filename)
+- Phase 2: replay the folder via `FrameSourceFactory.create('folder', ...)` reproducing the original pacing
+- Parses count/timestamp back from filenames and confirms per-frame metadata lines up
+- Hardware-free; temporary output folder auto-cleaned
+
+### 13. **source_swap_example.py** - One Loop, Any Source
+- Identical `process(cap)` loop (grayscale + edge count) over `--source webcam|video|folder`
+- The only source-specific code is a single factory line
+- Default `video` runs hardware-free; `webcam` documents the hardware path
+- Headless by default; `--show` opens a preview window
+
 ## Running Examples
 
 ### Option 1: Interactive Menu

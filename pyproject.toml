@@ -11,7 +11,7 @@ authors = [
     { name = "Oliver Hamilton" }
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { file = "LICENSE" }
 keywords = [
     "camera",
@@ -32,11 +32,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Video :: Capture",
     "Topic :: Scientific/Engineering :: Image Processing",
     "Typing :: Typed",
@@ -81,20 +81,49 @@ full = [
     "harvesters"
 ]
 
-[tool.black]
+[tool.ruff]
 line-length = 100
+target-version = "py39"
+extend-exclude = ["src/framesource/sources/mvsdk.py"]
 
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Deprecation shims must call warnings.warn() before importing the new
+# location, so the imports can't be at the top of the file.
+"src/frame_source/__init__.py" = ["E402"]
+"src/frame_processors/__init__.py" = ["E402"]
+# Vendor-source imports are deliberately grouped with their test section,
+# after earlier test functions, rather than hoisted to the top of the file.
+"tests/test_typed_constructors.py" = ["E402"]
 
 [tool.mypy]
-disallow_untyped_defs = true
 ignore_missing_imports = true
+
+# The vendor-SDK-heavy sources are exempt from strict typing until their
+# second typing pass; the core modules below are strict. Order matters:
+# for overlapping patterns the later section wins, and video_capture_base
+# matches both.
+[[tool.mypy.overrides]]
+module = ["framesource.sources.*"]
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+    "framesource.sources.video_capture_base",
+    "framesource.factory",
+    "framesource.threading_utils",
+]
+disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+markers = [
+    "hardware: tests that require physical capture hardware (deselected by default with -m 'not hardware')",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
